@@ -137,7 +137,7 @@ body{background:var(--bg);color:var(--txt);font-family:'DM Sans',sans-serif;-web
 .scan-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .scan-reader{position:relative;border:1px solid var(--brd);border-radius:14px;overflow:hidden;background:#05070a;min-height:280px;height:min(46dvh,420px);max-height:420px}
 .scan-reader:empty::before{content:'Scanner pronto';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px}.scan-reader video{transform:none!important}
-.scan-reader video{width:100%!important;height:100%!important;object-fit:cover!important;background:#05070a}.scan-video-wrap{position:relative;border:1px solid var(--brd);border-radius:14px;overflow:hidden;background:#05070a;min-height:260px}.scan-reader{position:relative;width:100%;height:260px;background:#05070a;border-radius:14px;overflow:hidden}.scan-viewport{pointer-events:none;position:absolute;z-index:5;left:6%;right:6%;top:22%;bottom:22%;border:2px solid rgba(255,255,255,.92);border-radius:16px;box-shadow:0 0 0 9999px rgba(0,0,0,.18) inset}.scan-video-wrap canvas,.scan-reader canvas{max-width:100%!important}
+.scan-reader video{width:100%!important;height:100%!important;object-fit:cover!important;background:#05070a}
 .scan-topbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .scan-topbar select,.scan-topbar input{background:var(--bg);border:1px solid var(--brd);color:var(--txt);padding:10px 12px;border-radius:10px;font-size:14px;font-family:inherit}
 .scan-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:12px;align-items:start;min-height:0;flex:1}
@@ -207,7 +207,8 @@ input[type="file"]{display:none}
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script>var defined_SHEETJS=false;</script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.21.3"></script>
+<script src="https://unpkg.com/@zxing/browser@0.1.5"></script>
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 window.supabaseLib={createClient};
@@ -891,18 +892,10 @@ function App(){
   const stopScanner=useCallback(async({resetLock=false}={})=>{
     scanBusyRef.current=false;
     setScanRunning(false);
-    try{
-      if(window.Quagga){
-        if(quaggaDetectedHandlerRef.current) window.Quagga.offDetected(quaggaDetectedHandlerRef.current);
-        if(quaggaProcessedHandlerRef.current) window.Quagga.offProcessed(quaggaProcessedHandlerRef.current);
-        try{window.Quagga.stop()}catch(e){}
-      }
-    }catch(e){}
-    quaggaDetectedHandlerRef.current=null;
-    quaggaProcessedHandlerRef.current=null;
-    quaggaReadyRef.current=false;
-    const target=document.getElementById('scan-reader');
-    if(target) target.innerHTML='';
+    try{zxingControlsRef.current?.stop?.()}catch(e){}
+    zxingControlsRef.current=null;
+    const video=document.getElementById('scan-video');
+    try{ if(video?.srcObject){ video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject=null; } }catch(e){}
     if(resetLock){
       scanLockRef.current=false;
       lastScanRef.current={code:'',ts:0};
@@ -956,29 +949,17 @@ function App(){
     }finally{setScanBusy(false)}
   },[data,recordScanHistory]);
 
-  const quaggaReadyRef=useRef(false);
-  const quaggaDetectedHandlerRef=useRef(null);
-  const quaggaProcessedHandlerRef=useRef(null);
+  const zxingReaderRef=useRef(null);
+  const zxingControlsRef=useRef(null);
 
-  const ensureQuagga=useCallback(()=>{
-    if(!window.Quagga){
+  const ensureZXingReader=useCallback(()=>{
+    if(!window.ZXingBrowser){
       throw new Error('Motore scanner non caricato.');
     }
-    return window.Quagga;
-  },[]);
-
-  const quaggaAcceptResult=useCallback((result)=>{
-    const raw=result?.codeResult?.code||'';
-    const code=digitsOnly(raw);
-    if(code.length<8)return false;
-    const decoded=Array.isArray(result?.codeResult?.decodedCodes)?result.codeResult.decodedCodes:[];
-    const errs=decoded.map(d=>typeof d?.error==='number'?d.error:null).filter(v=>v!=null && isFinite(v));
-    if(errs.length){
-      const avg=errs.reduce((a,b)=>a+b,0)/errs.length;
-      if(avg>0.18)return false;
-      if(code.length===13 && !(code.startsWith('978')||code.startsWith('979')) && avg>0.12)return false;
+    if(!zxingReaderRef.current){
+      zxingReaderRef.current = new window.ZXingBrowser.BrowserMultiFormatReader();
     }
-    return true;
+    return zxingReaderRef.current;
   },[]);
 
   const onCodeDetected=useCallback(async(decodedText, source='camera')=>{
@@ -1005,79 +986,86 @@ function App(){
     setScanMsg('Avvio scanner barcode…');
     try{
       await stopScanner({resetLock:true});
-      const target=document.getElementById('scan-reader');
-      if(!target) throw new Error('Area scanner non trovata.');
+      const video=document.getElementById('scan-video');
+      if(!video) throw new Error('Elemento video scanner non trovato.');
       const streamForLabels=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
       try{streamForLabels.getTracks().forEach(t=>t.stop())}catch(e){}
       const cams=await refreshScanCameras();
-      const Quagga=ensureQuagga();
       const constraints={
-        ...(scanCameraId?{deviceId:scanCameraId}:{facingMode:'environment'}),
-        width:{min:640,ideal:1280},
-        height:{min:480,ideal:720},
-        aspectRatio:{ideal:1.7777778},
-        focusMode:'continuous'
+        video:{
+          ...(scanCameraId?{deviceId:{exact:scanCameraId}}:{facingMode:{ideal:'environment'}}),
+          width:{ideal:1920},
+          height:{ideal:1080},
+          aspectRatio:{ideal:1.7777778}
+        },
+        audio:false
       };
-      await new Promise((resolve,reject)=>{
-        Quagga.init({
-          inputStream:{
-            type:'LiveStream',
-            target,
-            constraints,
-            area:{top:'22%',right:'6%',left:'6%',bottom:'22%'}
-          },
-          locator:{patchSize:'medium',halfSample:true},
-          numOfWorkers:Math.max(1, Math.min(4, navigator.hardwareConcurrency||2)),
-          frequency:10,
-          locate:true,
-          decoder:{readers:['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader']}
-        },(err)=>err?reject(err):resolve());
+      const reader=ensureZXingReader();
+      const controls = await reader.decodeFromConstraints(constraints, video, (result, err, ctrls)=>{
+        if(result?.getText){
+          const text=result.getText();
+          onCodeDetected(text,'camera');
+          return;
+        }
+        const name=err?.name||'';
+        if(name && !/NotFoundException|ChecksumException|FormatException/.test(name)){
+          setScanMsg('Scanner attivo ma la lettura ha restituito: '+name);
+        }
       });
-      quaggaDetectedHandlerRef.current=(result)=>{
-        if(!quaggaAcceptResult(result))return;
-        const code=result?.codeResult?.code||'';
-        onCodeDetected(code,'camera');
-      };
-      quaggaProcessedHandlerRef.current=()=>{};
-      Quagga.onDetected(quaggaDetectedHandlerRef.current);
-      Quagga.onProcessed(quaggaProcessedHandlerRef.current);
-      Quagga.start();
-      quaggaReadyRef.current=true;
+      zxingControlsRef.current=controls;
+      video.setAttribute('playsinline','true');
+      video.setAttribute('muted','true');
+      video.muted=true;
+      video.autoplay=true;
       setScanRunning(true);
-      setScanMsg(cams.length?'Scanner attivo. Allinea il barcode centrale nel riquadro, riempi bene la larghezza e resta fermo un secondo.':'Scanner attivo. Consenti la camera posteriore e prova con buona luce.');
+      setScanMsg(cams.length?'Scanner attivo. Riempi il riquadro con il codice principale EAN e tienilo fermo per 1 secondo.':'Scanner attivo. Consenti la camera posteriore e prova con buona luce.');
     }catch(err){
       setScanRunning(false);
       setScanMsg('Impossibile avviare la fotocamera scanner: '+(err?.message||String(err)));
-      try{ensureQuagga().stop()}catch(e){}
-      quaggaReadyRef.current=false;
+      try{zxingControlsRef.current?.stop?.()}catch(e){}
+      zxingControlsRef.current=null;
     }finally{
       scanBusyRef.current=false;
     }
-  },[ensureQuagga,onCodeDetected,quaggaAcceptResult,refreshScanCameras,scanCameraId,stopScanner]);
+  },[ensureZXingReader,onCodeDetected,refreshScanCameras,scanCameraId,stopScanner]);
 
   async function handleScanFileChange(e){
     const file=e.target.files?.[0];
     if(!file)return;
     setScanBusy(true);
-    setScanMsg('Analizzo immagine…');
+    setScanMsg('Analizzo immagine del barcode…');
     try{
       await stopScanner({resetLock:true});
-      const Quagga=ensureQuagga();
-      const url=URL.createObjectURL(file);
-      const result=await new Promise((resolve,reject)=>{
-        Quagga.decodeSingle({
-          src:url,
-          numOfWorkers:0,
-          locate:true,
-          decoder:{readers:['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader']}
-        },(res)=>res?.codeResult?.code?resolve(res):reject(new Error('Nessun barcode leggibile nella foto.')));
-      });
-      URL.revokeObjectURL(url);
-      const text=(result?.codeResult?.code||'');
-      if(!text) throw new Error('Nessun barcode leggibile nella foto.');
-      await onCodeDetected(text,'image');
+      let detected='';
+      const formats=['ean_13','ean_8','upc_a','upc_e','code_128'];
+      if(window.BarcodeDetector){
+        try{
+          const supported=await window.BarcodeDetector.getSupportedFormats?.();
+          const usable=(supported||formats).filter(f=>formats.includes(f));
+          if(usable.length){
+            const detector=new window.BarcodeDetector({formats:usable});
+            const bmp=await createImageBitmap(file);
+            const found=await detector.detect(bmp);
+            bmp?.close?.();
+            const raw=found?.[0]?.rawValue||'';
+            if(raw) detected=raw;
+          }
+        }catch(err){}
+      }
+      if(!detected){
+        const reader=ensureZXingReader();
+        const url=URL.createObjectURL(file);
+        try{
+          const result=await reader.decodeFromImageUrl(url);
+          detected=(result?.getText?.()||'');
+        }finally{
+          URL.revokeObjectURL(url);
+        }
+      }
+      if(!detected) throw new Error('Nessun barcode leggibile nella foto. Avvicina di più il codice, riempi l'inquadratura ed evita riflessi.');
+      await onCodeDetected(detected,'image');
     }catch(err){
-      setScanMsg('Foto non leggibile: '+(err?.message||String(err))+'. Prova a riempire l'immagine col barcode e a evitare riflessi.');
+      setScanMsg('Foto non leggibile: '+(err?.message||String(err)));
     }finally{
       setScanBusy(false);
       if(e.target)e.target.value='';
@@ -1091,7 +1079,7 @@ function App(){
       setScanResult(null);
       setScanBusy(false);
       setScanRunning(false);
-      setScanMsg('Apri la live camera oppure usa una foto del barcode.');
+      setScanMsg('Usa Scatta barcode per il flusso più affidabile, oppure prova la live beta.');
     }else stopScanner({resetLock:true});
   },[isIOS,showScan,stopScanner]);
 
@@ -1529,19 +1517,19 @@ function App(){
       {showScan&&<div className="mo" onClick={()=>{stopScanner({resetLock:true});setShowScan(false)}}><div className="md scan-modal" onClick={e=>e.stopPropagation()}>
         <h3>Scanner ISBN / EAN</h3>
         <div className="scan-box">
-          <div className="scan-tip">La camera ora si blocca alla prima lettura valida. Modalità live ottimizzata per Android e iPhone; se non aggancia, usa foto barcode.</div>
+          <div className="scan-tip">Ho rimesso l'app su una base stabile. Per telefono la modalità più affidabile ora è <strong>Scatta barcode</strong>: usa la fotocamera nativa, analizza la foto e poi propone carico o scarico. La live resta disponibile come prova beta.</div>
           <div className="scan-topbar">
             <span className="scan-mode-pill">{scanRunning?'🟢 Scanner attivo':'⚪ Scanner fermo'}</span>
-            <button className="btn bb" onClick={startScanner}>{scanRunning?'🔄 Riavvia live':'🎥 Avvia live'}</button>
-            <button className="btn ba" onClick={()=>scanFileRef.current?.click()}>📷 Usa foto</button>
+            <button className="btn ba" onClick={()=>scanFileRef.current?.click()}>📷 Scatta barcode</button>
+            <button className="btn bb" onClick={startScanner}>{scanRunning?'🔄 Riavvia live beta':'🎥 Live beta'}</button>
             <button className="btn bg" onClick={()=>stopScanner({resetLock:false})}>⏸ Ferma</button>
             <input ref={scanFileRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={handleScanFileChange}/>
             {(!isIOS || scanCameras.length>0) && <select value={scanCameraId} onChange={e=>setScanCameraId(e.target.value)}><option value="">Camera automatica</option>{scanCameras.map(cam=><option key={cam.id} value={cam.id}>{cam.label||`Camera ${cam.id.slice(0,6)}`}</option>)}</select>}
           </div>
           <div className="scan-grid">
             <div>
-              <div className="scan-video-wrap"><div className="scan-viewport"></div><div id="scan-reader" className="scan-reader"></div></div>
-              <div className="scan-stat" style={{marginTop:8}}>Suggerimento: avvicina il codice fino a riempire buona parte dell'inquadratura, evita riflessi e resta fermo 1 secondo. Se non legge, usa una foto ravvicinata del barcode.</div>
+              <div id="scan-reader" className="scan-reader"></div>
+              <div className="scan-stat" style={{marginTop:8}}>Consiglio pratico: per risultati migliori usa <strong>Scatta barcode</strong>, centra solo il codice principale EAN/ISBN, riempi quasi tutto il fotogramma ed evita i riflessi lucidi.</div>
               <div className="scan-inline" style={{marginTop:10}}>
                 <input value={scanCode} onChange={e=>setScanCode(e.target.value)} placeholder="Inserisci ISBN / EAN manualmente" inputMode="numeric" style={{flex:'1 1 220px',background:'var(--bg)',border:'1px solid var(--brd)',color:'var(--txt)',padding:'10px 12px',borderRadius:10,fontSize:14,fontFamily:'inherit'}}/>
                 <button className="btn ba" onClick={()=>{scanLockRef.current=true;runBarcodeLookup(scanCode,'manual')}} disabled={scanBusy}>{scanBusy?'Cerco…':'Cerca codice'}</button>
