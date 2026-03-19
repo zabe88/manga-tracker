@@ -321,6 +321,8 @@ function App(){
   const lastRemoteRef=useRef('');
   const pushTimerRef=useRef(null);
   const channelRef=useRef(null);
+  const channelClientRef=useRef(null);
+  const cloudPayloadRef=useRef(normalizePayload({data,favs,cart}));
 
   const cloudEnabled=!!(cloudCfg.url&&cloudCfg.key);
 
@@ -338,6 +340,7 @@ function App(){
   },[]);
 
   const cloudPayload=useMemo(()=>normalizePayload({data,favs,cart}),[data,favs,cart]);
+  useEffect(()=>{cloudPayloadRef.current=cloudPayload},[cloudPayload]);
 
   useEffect(()=>{try{
     localStorage.setItem(K_DATA,JSON.stringify(data));
@@ -404,8 +407,11 @@ function App(){
 
   const startRealtime=useCallback((client)=>{
     if(!client)return;
+    if(channelRef.current&&channelClientRef.current===client)return;
     try{
-      if(channelRef.current)client.removeChannel(channelRef.current);
+      if(channelRef.current&&channelClientRef.current){
+        channelClientRef.current.removeChannel(channelRef.current);
+      }
     }catch(e){}
     const channel=client
       .channel('app-state-live')
@@ -432,11 +438,12 @@ function App(){
         if(status==='CHANNEL_ERROR')setCloudInfo({tone:'warn',title:'Realtime non attivo',text:'La sync continua comunque tramite caricamento/salvataggio standard.'});
       });
     channelRef.current=channel;
+    channelClientRef.current=client;
   },[applyRemotePayload]);
 
   const pushRemote=useCallback(async(payloadOverride)=>{
     if(!supabase||!session)return;
-    const payload=normalizePayload(payloadOverride||cloudPayload);
+    const payload=normalizePayload(payloadOverride||cloudPayloadRef.current);
     setCloudInfo({tone:'info',title:'Sincronizzazione in corso',text:'Invio le modifiche al database condiviso…'});
     const {data:row,error}=await supabase
       .from('app_state')
@@ -455,7 +462,7 @@ function App(){
       setTs(t);
     }
     setCloudInfo({tone:'ok',title:'Cloud sincronizzato',text:'Le modifiche sono ora persistenti per tutti gli utenti autorizzati.'});
-  },[supabase,session,cloudPayload]);
+  },[supabase,session]);
 
   const loadRemote=useCallback(async()=>{
     if(!supabase||!session)return;
@@ -470,7 +477,7 @@ function App(){
       return;
     }
     if(!row){
-      const initialPayload=normalizePayload(cloudPayload);
+      const initialPayload=normalizePayload(cloudPayloadRef.current);
       lastRemoteRef.current=stable(initialPayload);
       await pushRemote(initialPayload);
       setRemoteLoaded(true);
@@ -483,7 +490,7 @@ function App(){
     setRemoteLoaded(true);
     setCloudInfo({tone:'ok',title:'Cloud collegato',text:'Stai lavorando sullo stato condiviso centrale.'});
     startRealtime(supabase);
-  },[supabase,session,cloudPayload,pushRemote,applyRemotePayload,startRealtime]);
+  },[supabase,session,pushRemote,applyRemotePayload,startRealtime]);
 
   useEffect(()=>{
     if(!supabase||!session){
@@ -505,7 +512,7 @@ function App(){
     return()=>clearTimeout(pushTimerRef.current);
   },[data,favs,cart,supabase,session,remoteLoaded,pushRemote]);
 
-  useEffect(()=>()=>{try{if(channelRef.current&&supabase)supabase.removeChannel(channelRef.current)}catch(e){}},[supabase]);
+  useEffect(()=>()=>{try{if(channelRef.current&&channelClientRef.current)channelClientRef.current.removeChannel(channelRef.current)}catch(e){}},[]);
 
   const editori=useMemo(()=>{const m={};data.forEach(d=>{m[d.e]=(m[d.e]||0)+1});return Object.entries(m).sort((a,b)=>b[1]-a[1])}, [data]);
   const stats=useMemo(()=>{let ow=0,mi=0,pz=0;data.forEach(d=>{if(d.s){ow+=d.h.length;const mx=d.ut||d.mx;for(let i=1;i<=mx;i++)if(!d.h.includes(i))mi++}pz+=d.tp});return{t:data.length,ow,mi,pz}}, [data]);
