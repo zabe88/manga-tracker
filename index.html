@@ -132,6 +132,7 @@ body{background:var(--bg);color:var(--txt);font-family:'DM Sans',sans-serif;-web
 .hot-loading{text-align:center;padding:30px;color:var(--dim)}
 .hot-spinner{display:inline-block;width:20px;height:20px;border:2px solid var(--brd);border-top-color:var(--hot);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:520px){.hot-controls{grid-template-columns:1fr}}
 
 /* Modal */
 .mo{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100;display:flex;align-items:flex-end;justify-content:center}
@@ -147,7 +148,6 @@ input[type="file"]{display:none}
   .sn{font-size:14px}.vg{grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px}
   .mo{align-items:center}.md{border-radius:12px}.popup{border-radius:12px;margin-bottom:20px}
 }
-@media(max-width:520px){.hot-controls{grid-template-columns:1fr}}
 @media(min-width:900px){.vg{grid-template-columns:repeat(auto-fill,minmax(72px,1fr))}}
 </style>
 </head>
@@ -166,6 +166,63 @@ function prep(){return INIT.map((d,i)=>({...d,id:i,ut:d.tu||d.mx}))}
 function gm(h,mx){const m=[];for(let i=1;i<=mx;i++)if(!h.includes(i))m.push(i);return m}
 function coverUrl(ean){if(!ean||ean==='None'||ean==='nan'||String(ean).length<10)return null;return 'https://books.google.com/books/content?vid=isbn:'+ean+'&printsec=frontcover&img=1&zoom=1'}
 
+const HOT_CACHE_KEY=SK+'_hot_v3';
+const HOT_SETTINGS_KEY=SK+'_hot_settings_v3';
+const HOT_DEFAULT_SETTINGS={mode:'hybrid',autoRefreshMinutes:30,maxItems:10};
+const HOT_TAG_META={new:{label:'NOVITÀ'},trend:{label:'TREND'},fire:{label:'🔥 HOT'},restock:{label:'RESTOCK'},watch:{label:'WATCH'}};
+
+function safeReadJSON(key,fallback=null){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch{return fallback}}
+function safeWriteJSON(key,value){try{localStorage.setItem(key,JSON.stringify(value))}catch{}}
+function clamp(n,min,max){return Math.min(Math.max(Number(n)||0,min),max)}
+function hotLabel(tag){return HOT_TAG_META[tag]?.label||'HOT'}
+function hotTimeAgo(ts){
+  if(!ts)return 'mai';
+  const diff=Math.max(0,Date.now()-ts);
+  const mins=Math.round(diff/60000);
+  if(mins<1)return 'adesso';
+  if(mins<60)return `${mins} min fa`;
+  const hours=Math.round(mins/60);
+  if(hours<24)return `${hours} h fa`;
+  const days=Math.round(hours/24);
+  return `${days} g fa`;
+}
+function hotFmtDate(value){
+  const ts=hotDateToTs(value);
+  if(!ts)return 'data non disponibile';
+  return new Date(ts).toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+function hotDateToTs(value=''){
+  const s=String(value||'').trim();
+  if(!s)return 0;
+  if(/^\d{4}$/.test(s))return new Date(`${s}-01-01T00:00:00`).getTime();
+  if(/^\d{4}-\d{2}$/.test(s))return new Date(`${s}-01T00:00:00`).getTime();
+  const t=Date.parse(s);
+  return Number.isNaN(t)?0:t;
+}
+function hotBaseTitle(title=''){
+  return String(title||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\[[^\]]+\]|\([^)]*\)|\{[^}]*\}/g,' ').replace(/\b(edizione|edition|variant|var|deluxe|perfect|new|romanzo|novel|film|fanbook|starter|pack|speciale|spinoff|spin|off)\b/g,' ').replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+}
+function hotCleanTitle(title=''){return String(title||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim()}
+function hotPublisherNorm(name=''){return String(name||'').toUpperCase().replace(/\s+/g,' ').trim()}
+function hotReadCache(){return safeReadJSON(HOT_CACHE_KEY,null)}
+function hotWriteCache(payload){safeWriteJSON(HOT_CACHE_KEY,payload)}
+function hotMergeSettings(raw){
+  return{
+    mode:['hybrid','web','catalog'].includes(raw?.mode)?raw.mode:HOT_DEFAULT_SETTINGS.mode,
+    autoRefreshMinutes:[0,5,15,30,60].includes(Number(raw?.autoRefreshMinutes))?Number(raw.autoRefreshMinutes):HOT_DEFAULT_SETTINGS.autoRefreshMinutes,
+    maxItems:clamp(parseInt(raw?.maxItems,10)||HOT_DEFAULT_SETTINGS.maxItems,6,16)
+  };
+}
+function hotDedup(items){
+  const seen=new Set();
+  return(items||[]).filter(Boolean).filter(item=>{
+    const key=item.key||`${hotBaseTitle(item.title)}|${hotPublisherNorm(item.publisher)}`;
+    if(!key||seen.has(key))return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function CoverImg({ean,size}){
   const[ok,setOk]=useState(true);const url=coverUrl(ean);
   const w=size||42;const h=Math.round(w*1.4);
@@ -181,80 +238,6 @@ function VolCover({ean,num}){
   return <div className="vl-ph">{num}</div>;
 }
 
-
-const HOT_CACHE_KEY = SK+'_hot_v2';
-const HOT_SETTINGS_KEY = SK+'_hot_settings';
-const HOT_DEFAULT_SETTINGS = {mode:'hybrid',autoRefreshMinutes:30,maxItems:10};
-const HOT_TAG_META = {
-  new:{label:'NOVITÀ'},
-  trend:{label:'TREND'},
-  fire:{label:'🔥 HOT'},
-  restock:{label:'RIORDINO'},
-  watch:{label:'WATCH'}
-};
-
-function safeReadJSON(key,fallback){
-  try{
-    const raw=localStorage.getItem(key);
-    if(!raw)return fallback;
-    const parsed=JSON.parse(raw);
-    return parsed==null?fallback:parsed;
-  }catch{return fallback}
-}
-function safeWriteJSON(key,value){try{localStorage.setItem(key,JSON.stringify(value))}catch{}}
-function clamp(n,min,max){return Math.min(max,Math.max(min,n))}
-function hotLabel(tag){return HOT_TAG_META[tag]?.label||'HOT'}
-function hotTimeAgo(ts){
-  if(!ts)return 'mai';
-  const diff=Date.now()-ts;
-  const mins=Math.round(diff/60000);
-  if(mins<1)return 'adesso';
-  if(mins<60)return `${mins} min fa`;
-  const hrs=Math.round(mins/60);
-  if(hrs<24)return `${hrs} h fa`;
-  const days=Math.round(hrs/24);
-  return `${days} g fa`;
-}
-function hotFmtDate(value){
-  if(!value)return '';
-  const d=new Date(value);
-  if(Number.isNaN(d.getTime()))return value;
-  return d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
-}
-function hotBaseTitle(title=''){
-  return String(title||'')
-    .toUpperCase()
-    .replace(/\[[^\]]*\]/g,' ')
-    .replace(/\([^)]*\)/g,' ')
-    .replace(/\b(VOL\.?|VOLUME|VOL|N\.?|TOMO)\s*\d+\b/gi,' ')
-    .replace(/\b(EDIZIONE|ED\.|NEW EDITION|STARTER PACK|FANBOOK|VARIANT)\b/gi,' ')
-    .replace(/[:\-–—].*$/,' ')
-    .replace(/\s+/g,' ')
-    .trim();
-}
-function hotCleanTitle(title=''){return String(title||'').replace(/\s+/g,' ').trim()}
-function hotPublisherNorm(name=''){return String(name||'').toUpperCase().replace(/\s+/g,' ').trim()}
-function hotPickPublisherFromQuery(query=''){const m=query.match(/"([^"]+)"/);return m?m[1]:''}
-function hotReadCache(){return safeReadJSON(HOT_CACHE_KEY,null)}
-function hotWriteCache(payload){safeWriteJSON(HOT_CACHE_KEY,payload)}
-function hotMergeSettings(raw){
-  return {
-    mode:['hybrid','web','catalog'].includes(raw?.mode)?raw.mode:HOT_DEFAULT_SETTINGS.mode,
-    autoRefreshMinutes:[0,5,15,30,60].includes(Number(raw?.autoRefreshMinutes))?Number(raw.autoRefreshMinutes):HOT_DEFAULT_SETTINGS.autoRefreshMinutes,
-    maxItems:clamp(parseInt(raw?.maxItems,10)||HOT_DEFAULT_SETTINGS.maxItems,6,16)
-  };
-}
-function hotDedup(items){
-  const map=new Map();
-  (items||[]).forEach(item=>{
-    if(!item||!item.title)return;
-    const key=item.key||`${hotBaseTitle(item.title)}|${hotPublisherNorm(item.publisher)}`;
-    const prev=map.get(key);
-    if(!prev||(item.score||0)>(prev.score||0))map.set(key,item);
-  });
-  return [...map.values()];
-}
-
 function App(){
   const[data,setData]=useState(()=>{try{const s=localStorage.getItem(SK);if(s){const p=JSON.parse(s);if(Array.isArray(p)&&p.length>0)return p}}catch(e){}return prep()});
   const[ts,setTs]=useState(localStorage.getItem(SK+'_ts')||'');
@@ -265,9 +248,11 @@ function App(){
   const[favs,setFavs]=useState(()=>{try{return JSON.parse(localStorage.getItem(SK+'_fav'))||[]}catch{return[]}});
   const[cart,setCart]=useState(()=>{try{return JSON.parse(localStorage.getItem(SK+'_cart'))||[]}catch{return[]}});
   const[popup,setPopup]=useState(null);
-  const[hotData,setHotData]=useState(()=>hotReadCache()?.data||[]);const[hotLoading,setHotLoading]=useState(false);
+  const[hotData,setHotData]=useState(()=>hotReadCache()?.data||[]);
+  const[hotLoading,setHotLoading]=useState(false);
   const[hotMeta,setHotMeta]=useState(()=>hotReadCache()?.meta||{ts:0,status:'idle',source:'',count:0,error:''});
   const[hotSettings,setHotSettings]=useState(()=>hotMergeSettings(safeReadJSON(HOT_SETTINGS_KEY,HOT_DEFAULT_SETTINGS)));
+  const[isOnline,setIsOnline]=useState(typeof navigator==='undefined'?true:navigator.onLine);
   const hotAbortRef=useRef(null);
   const fRef=useRef(null);
 
@@ -275,66 +260,16 @@ function App(){
   useEffect(()=>{try{localStorage.setItem(SK+'_fav',JSON.stringify(favs))}catch{}}, [favs]);
   useEffect(()=>{try{localStorage.setItem(SK+'_cart',JSON.stringify(cart))}catch{}}, [cart]);
   useEffect(()=>{safeWriteJSON(HOT_SETTINGS_KEY,hotSettings)}, [hotSettings]);
+  useEffect(()=>{
+    const onOnline=()=>setIsOnline(true);
+    const onOffline=()=>setIsOnline(false);
+    window.addEventListener('online',onOnline);
+    window.addEventListener('offline',onOffline);
+    return()=>{window.removeEventListener('online',onOnline);window.removeEventListener('offline',onOffline);}
+  },[]);
 
   const editori=useMemo(()=>{const m={};data.forEach(d=>{m[d.e]=(m[d.e]||0)+1});return Object.entries(m).sort((a,b)=>b[1]-a[1])}, [data]);
   const stats=useMemo(()=>{let ow=0,mi=0,pz=0;data.forEach(d=>{if(d.s){ow+=d.h.length;const mx=d.ut||d.mx;for(let i=1;i<=mx;i++)if(!d.h.includes(i))mi++}pz+=d.tp});return{t:data.length,ow,mi,pz}}, [data]);
-
-  const hotCatalogLookup=useMemo(()=>{
-    const map=new Map();
-    data.forEach(d=>map.set(hotBaseTitle(d.n),d));
-    return map;
-  },[data]);
-
-  const hotLocalInsights=useMemo(()=>{
-    const series=data.filter(d=>d.s);
-    const withMissing=series.map(d=>({d,miss:gm(d.h,d.ut||d.mx)})).filter(x=>x.miss.length>0).sort((a,b)=>b.miss.length-a.miss.length);
-    const lowStock=series.map(d=>({d,ones:(d.vd||[]).filter(v=>d.h.includes(v.n)&&v.g===1)})).filter(x=>x.ones.length>0).sort((a,b)=>b.ones.length-a.ones.length);
-    const nearComplete=series.map(d=>{const mx=d.ut||d.mx;const miss=gm(d.h,mx);const pct=mx>0?d.h.length/mx:0;return{d,mx,miss,pct}}).filter(x=>x.mx>0&&x.miss.length>0).sort((a,b)=>b.pct-a.pct||a.miss.length-b.miss.length);
-    const favSeries=data.filter(d=>favs.includes(d.id));
-    const cartSeries=[...new Set(cart.map(c=>c.sid))].map(id=>data.find(d=>d.id===id)).filter(Boolean);
-
-    const items=[];
-    if(withMissing[0]){
-      const x=withMissing[0];
-      items.push({
-        key:`restock|${x.d.id}`,
-        title:`${x.d.n}: da monitorare`,
-        tag:'restock',source:'Catalogo',sourceLabel:'Catalogo',publishedDate:'',
-        text:`${x.miss.length} volumi mancanti su ${x.d.ut||x.d.mx}. Priorità alta per recupero arretrati o riordino mirato.`,
-        score:340+x.miss.length
-      });
-    }
-    lowStock.slice(0,2).forEach(x=>items.push({
-      key:`low|${x.d.id}`,
-      title:`${x.d.n}: scorte basse`,tag:'watch',source:'Catalogo',sourceLabel:'Catalogo',publishedDate:'',
-      text:`${x.ones.length} volumi risultano con una sola copia disponibile. Conviene sorvegliarla prima che si esaurisca.`,
-      score:310+x.ones.length*3
-    }));
-    nearComplete.slice(0,2).forEach(x=>items.push({
-      key:`near|${x.d.id}`,
-      title:`${x.d.n}: quasi completa`,tag:'fire',source:'Catalogo',sourceLabel:'Catalogo',publishedDate:'',
-      text:`Hai ${x.d.h.length}/${x.mx} volumi. Mancano ${x.miss.length}: ${x.miss.slice(0,6).join(', ')}${x.miss.length>6?'…':''}.`,
-      score:300+Math.round(x.pct*100)
-    }));
-    favSeries.slice(0,2).forEach(d=>items.push({
-      key:`fav|${d.id}`,
-      title:`${d.n}: osservata speciale`,tag:'fire',source:'Catalogo',sourceLabel:'Preferiti',publishedDate:'',
-      text:`La serie è tra i tuoi preferiti: tienila in primo piano per acquisti, variant o spin-off.`,
-      score:295
-    }));
-    cartSeries.slice(0,2).forEach(d=>{
-      const qty=cart.filter(c=>c.sid===d.id).reduce((s,c)=>s+c.qty,0);
-      items.push({
-        key:`cart|${d.id}`,
-        title:`${d.n}: interesse attivo`,tag:'trend',source:'Catalogo',sourceLabel:'Carrello',publishedDate:'',
-        text:`Hai già ${qty} pezzi collegati a questa serie nel carrello ordine: resta calda e va seguita.`,
-        score:280+qty
-      });
-    });
-    return hotDedup(items).slice(0,8);
-  },[data,favs,cart]);
-
-  const hotStaleMs=useMemo(()=>hotSettings.autoRefreshMinutes>0?hotSettings.autoRefreshMinutes*60000:6*60*60000,[hotSettings.autoRefreshMinutes]);
 
   function getEanMap(d){const m={};(d.vd||[]).forEach(v=>{if(v.ean)m[v.n]=v.ean});return m}
   function getSeriesEan(d){if(d.vd&&d.vd.length>0){const f=d.vd.find(v=>v.ean);if(f)return f.ean}if(d.st&&d.st.length>0){const f=d.st.find(s=>s.ean);if(f)return f.ean}return null}
@@ -387,64 +322,124 @@ function App(){
   function dlBackup(){const b=new Blob([JSON.stringify({data,favs,cart},null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`manga_backup_${new Date().toISOString().slice(0,10)}.json`;a.click()}
   function loadBackup(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.data&&Array.isArray(d.data)){if(confirm(`${d.data.length} serie trovate. Sostituire?`)){setData(d.data);if(d.favs)setFavs(d.favs);if(d.cart)setCart(d.cart);setExp(null)}}else if(Array.isArray(d)){if(confirm(`${d.length} serie. Sostituire?`)){setData(d);setExp(null)}}}catch(err){alert('Errore: '+err.message)}};r.readAsText(f);e.target.value=''}
 
-  const fetchGoogleBooksHot=useCallback(async(signal)=>{
-    const preferred=[...new Set([
-      ...editori.slice(0,6).map(([ed])=>ed),
-      'STAR COMICS','PANINI COMICS','PLANET MANGA','EDIZIONI BD','J-POP','JPOP','BAO PUBLISHING'
-    ])].filter(Boolean).slice(0,5);
-    const queries=['subject:manga',...preferred.map(ed=>`"${ed}" manga`)];
-    const collected=[];
+  const hotCatalogLookup=useMemo(()=>{
+    const map=new Map();
+    data.forEach(d=>map.set(hotBaseTitle(d.n),d));
+    return map;
+  },[data]);
 
-    await Promise.allSettled(queries.map(async(query,index)=>{
-      const u=new URL('https://www.googleapis.com/books/v1/volumes');
-      u.searchParams.set('q',query);
-      u.searchParams.set('langRestrict','it');
-      u.searchParams.set('printType','books');
-      u.searchParams.set('orderBy','newest');
-      u.searchParams.set('maxResults','10');
-      const r=await fetch(u.toString(),{signal,cache:'no-store'});
-      if(!r.ok)throw new Error(`Google Books ${r.status}`);
-      const payload=await r.json();
-      (payload.items||[]).forEach(raw=>{
-        const info=raw.volumeInfo||{};
-        const title=hotCleanTitle(info.title||'Senza titolo');
-        const base=hotBaseTitle(title);
-        if(!base)return;
-        const publisher=hotCleanTitle(info.publisher||hotPickPublisherFromQuery(query)||'');
-        const matched=hotCatalogLookup.get(base);
-        const dateRaw=String(info.publishedDate||'');
-        const dateNorm=dateRaw.length===4?`${dateRaw}-01-01`:dateRaw.length===7?`${dateRaw}-01`:dateRaw;
-        const d=dateNorm?new Date(dateNorm):null;
-        const ts=d&&!Number.isNaN(d.getTime())?d.getTime():0;
-        const days=ts?Math.floor((Date.now()-ts)/86400000):99999;
-        const authors=Array.isArray(info.authors)&&info.authors.length?info.authors.slice(0,2).join(', '):'';
-        const cats=(info.categories||[]).join(' ').toLowerCase();
-        const desc=hotCleanTitle((info.description||'').replace(/<[^>]*>/g,' '));
-        const textBlob=`${title} ${publisher} ${cats} ${desc}`.toLowerCase();
-        if(index===0&&!/(manga|graphic novel|graphic novels|comics|fumett)/i.test(textBlob))return;
-        let tag='trend';
-        if(days<=60)tag='new';
-        if(matched&&(favs.includes(matched.id)||cart.some(c=>c.sid===matched.id)))tag='fire';
-        else if(matched&&matched.s&&gm(matched.h,matched.ut||matched.mx).length>0)tag='trend';
-        const context=[];
-        if(publisher)context.push(publisher);
-        if(ts)context.push(hotFmtDate(d.toISOString()));
-        if(matched){
-          const missCount=matched.s?gm(matched.h,matched.ut||matched.mx).length:0;
-          context.push(missCount>0?`${missCount} mancanti nel tuo catalogo`:'già presente in catalogo');
-        }
-        const tail=authors?` — ${authors}`:desc?` — ${desc.slice(0,130)}${desc.length>130?'…':''}`:'';
-        collected.push({
-          key:`${base}|${hotPublisherNorm(publisher)}`,
-          title,publisher,tag,source:'Web',sourceLabel:'Google Books',
-          url:info.infoLink||info.previewLink||'',
-          publishedDate:ts?d.toISOString():'',
-          text:`${context.join(' · ')}${tail}`.trim(),
-          score:(tag==='fire'?500:tag==='new'?430:320)+(matched?80:0)+clamp(120-(days>0?days:120),0,120)
-        });
+  const hotLocalInsights=useMemo(()=>{
+    const items=[];
+    data.forEach(d=>{
+      const missing=d.s?gm(d.h,d.ut||d.mx):[];
+      const fav=favs.includes(d.id);
+      const cartRows=cart.filter(c=>c.sid===d.id);
+      const cartQty=cartRows.reduce((s,c)=>s+(Number(c.qty)||0),0);
+      const signals=[];
+      let score=0;
+      let tag='trend';
+
+      if(fav){score+=18;tag='watch';signals.push('nei preferiti');}
+      if(cartQty){score+=22+(cartQty*3);tag='fire';signals.push(`${cartQty} nel carrello`);}
+      if(d.tp>=2){score+=Math.min(d.tp,4)*3;signals.push(`${d.tp} copie`);}
+
+      if(d.s){
+        const total=d.ut||d.mx||0;
+        if(d.h.length===1&&total<=2){score+=10;if(!cartQty)tag='new';signals.push('serie appena entrata');}
+        if(missing.length>0){score+=Math.min(missing.length,5);if(cartQty||fav)tag='restock';signals.push(`mancano ${missing.length} vol.`);}
+        if(total>0&&missing.length>0&&missing.length<=2)score+=7;
+      }else if(d.tp>=2){
+        score+=8;
+      }
+
+      if(score<12)return;
+
+      const textParts=[`Segnale dal tuo catalogo: ${signals.join(' · ')||'interesse attivo'}.`];
+      if(d.s&&missing.length>0){
+        const preview=missing.slice(0,6).join(', ');
+        textParts.push(`Volumi mancanti: ${preview}${missing.length>6?'…':''}.`);
+      }
+
+      items.push({
+        key:`local|${d.id}|${hotBaseTitle(d.n)}`,
+        title:d.n,
+        text:textParts.join(' '),
+        tag,
+        source:'Catalogo',
+        sourceLabel:'Radar locale',
+        publisher:d.e,
+        publishedDate:'',
+        score,
+        url:''
       });
+    });
+    return hotDedup(items).sort((a,b)=>(b.score||0)-(a.score||0)).slice(0,12);
+  },[data,cart,favs]);
+
+  const hotStaleMs=useMemo(()=>hotSettings.autoRefreshMinutes>0?hotSettings.autoRefreshMinutes*60000:6*60*60000,[hotSettings.autoRefreshMinutes]);
+
+  const fetchGoogleBooksHot=useCallback(async(signal)=>{
+    const preferred=['STAR COMICS','PANINI COMICS','EDIZIONI BD','J-POP MANGA','BAO PUBLISHING'];
+    const dynamic=editori.map(([name])=>name).filter(Boolean);
+    const publishers=Array.from(new Set([...preferred,...dynamic])).slice(0,6);
+    const results=await Promise.allSettled(publishers.map(async publisher=>{
+      const q=`subject:manga inpublisher:"${publisher}"`;
+      const url=`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&orderBy=newest&langRestrict=it&printType=books&maxResults=8`;
+      const res=await fetch(url,{signal});
+      if(!res.ok)throw new Error(`Google Books ${res.status}`);
+      const json=await res.json();
+      return (json.items||[]).map(item=>{
+        const info=item.volumeInfo||{};
+        const title=hotCleanTitle(info.title||'Senza titolo');
+        if(!title)return null;
+        const base=hotBaseTitle(title);
+        const publisherName=hotCleanTitle(info.publisher||publisher||'');
+        const publishedDate=info.publishedDate||'';
+        const ts=hotDateToTs(publishedDate);
+        const desc=hotCleanTitle(info.description||'');
+        const matched=hotCatalogLookup.get(base);
+        const matchedMissing=matched&&matched.s?gm(matched.h,matched.ut||matched.mx).length:0;
+        const matchedFav=matched?favs.includes(matched.id):false;
+        const matchedCartQty=matched?cart.filter(c=>c.sid===matched.id).reduce((s,c)=>s+(Number(c.qty)||0),0):0;
+        const ageDays=ts?Math.round((Date.now()-ts)/86400000):9999;
+
+        let score=ts?(ageDays<=30?40:ageDays<=90?28:ageDays<=180?18:8):6;
+        if(matched)score+=18;
+        if(matchedFav)score+=10;
+        if(matchedCartQty)score+=8+(matchedCartQty*3);
+        if(matchedMissing)score+=Math.min(matchedMissing,4);
+
+        let tag='trend';
+        if(ts&&ageDays<=45)tag='new';
+        if(matched&&(matchedCartQty||matchedFav))tag='fire';
+        else if(matched&&matchedMissing)tag='restock';
+
+        const textBits=[];
+        if(desc)textBits.push(desc.slice(0,170)+(desc.length>170?'…':''));
+        const ctx=[];
+        if(publisherName)ctx.push(publisherName);
+        if(ts)ctx.push(hotFmtDate(new Date(ts).toISOString()));
+        if(matched)ctx.push('già presente nel catalogo');
+        if(matchedMissing)ctx.push(`${matchedMissing} vol. mancanti`);
+        if(ctx.length)textBits.push(ctx.join(' · '));
+
+        return{
+          key:`web|${base}|${hotPublisherNorm(publisherName)}`,
+          title,
+          text:textBits.join(' — ')||'Nuova uscita o titolo in evidenza intercettato dal web.',
+          tag,
+          source:'Google Books',
+          sourceLabel:'Web',
+          publisher:publisherName,
+          publishedDate:ts?new Date(ts).toISOString():publishedDate,
+          score,
+          url:info.infoLink||info.previewLink||''
+        };
+      }).filter(Boolean);
     }));
 
+    const collected=results.flatMap(r=>r.status==='fulfilled'?r.value:[]);
+    if(!collected.length)throw new Error('Nessun dato web disponibile');
     return hotDedup(collected).sort((a,b)=>(b.score||0)-(a.score||0));
   },[editori,hotCatalogLookup,favs,cart]);
 
@@ -456,13 +451,31 @@ function App(){
   const loadHot=useCallback(async(opts={})=>{
     const force=!!opts.force;
     const silent=!!opts.silent;
+    const localItems=hotSettings.mode==='web'?[]:hotLocalInsights;
     const cached=hotReadCache();
-    const cacheFresh=!!(cached&&cached.ts&&Date.now()-cached.ts<hotStaleMs&&Array.isArray(cached.data)&&cached.data.length);
+    const cachedWeb=Array.isArray(cached?.webItems)?cached.webItems:[];
+    const cacheFresh=!!(cached&&cached.ts&&Date.now()-cached.ts<hotStaleMs);
 
-    if(!force&&cacheFresh){
-      setHotData(cached.data);
-      setHotMeta({...cached.meta,status:'ready',error:''});
-      return cached.data;
+    const combineItems=(webItems)=>{
+      let items=[];
+      if(hotSettings.mode==='web')items=webItems;
+      else if(hotSettings.mode==='catalog')items=localItems;
+      else items=[...webItems,...localItems];
+      return hotDedup(items).sort((a,b)=>(b.score||0)-(a.score||0)).slice(0,hotSettings.maxItems);
+    };
+    const sourceLabel=(webItems)=>{
+      if(hotSettings.mode==='catalog')return 'catalogo locale';
+      if(hotSettings.mode==='web')return webItems.length?'web':'cache web';
+      return webItems.length?'ibrida':'catalogo locale';
+    };
+
+    if(!force&&(hotSettings.mode==='catalog'||cacheFresh)){
+      const warmItems=combineItems(cachedWeb);
+      if(warmItems.length){
+        setHotData(warmItems);
+        setHotMeta({ts:hotSettings.mode==='catalog'?Date.now():(cached?.ts||Date.now()),count:warmItems.length,source:sourceLabel(cachedWeb),status:'ready',error:''});
+        if(hotSettings.mode==='catalog'||cacheFresh)return;
+      }
     }
 
     if(hotAbortRef.current)hotAbortRef.current.abort();
@@ -473,60 +486,53 @@ function App(){
     setHotMeta(p=>({...p,status:'loading',error:''}));
 
     try{
-      const localItems=hotSettings.mode==='web'?[]:hotLocalInsights;
-      const webItems=hotSettings.mode==='catalog'||!navigator.onLine?[]:await fetchGoogleBooksHot(controller.signal);
-      let items=[];
-      if(hotSettings.mode==='web')items=webItems;
-      else if(hotSettings.mode==='catalog')items=localItems;
-      else items=[...webItems,...localItems];
-      items=hotDedup(items).sort((a,b)=>(b.score||0)-(a.score||0)).slice(0,hotSettings.maxItems);
-
-      if(!items.length)throw new Error(navigator.onLine?'Nessun risultato disponibile al momento':'Sei offline: uso solo segnali locali');
-
-      const meta={
-        ts:Date.now(),
-        count:items.length,
-        source:hotSettings.mode==='catalog'?'catalogo locale':hotSettings.mode==='web'?'web':'ibrida',
-        status:'ready',
-        error:''
-      };
+      let webItems=[];
+      if(hotSettings.mode!=='catalog'){
+        if(!isOnline)throw new Error('Connessione assente');
+        webItems=await fetchGoogleBooksHot(controller.signal);
+      }
+      const items=combineItems(webItems);
+      const ts=Date.now();
+      const meta={ts,count:items.length,source:sourceLabel(webItems),status:'ready',error:''};
       setHotData(items);
       setHotMeta(meta);
-      hotWriteCache({ts:meta.ts,data:items,meta});
-      return items;
+      hotWriteCache({ts,data:items,webItems,meta});
     }catch(err){
       if(err?.name==='AbortError')return;
-      console.error('HOT engine error:',err);
-      const message=err?.message||'Aggiornamento non riuscito';
-      if(cached&&Array.isArray(cached.data)&&cached.data.length){
-        setHotData(cached.data);
-        setHotMeta({...cached.meta,status:'fallback',error:`${message}. Visualizzo l'ultima cache valida.`});
-        return cached.data;
+      const message=err?.message||'Errore Hot';
+      const cachedItems=combineItems(cachedWeb);
+      if(cachedItems.length){
+        setHotData(cachedItems);
+        setHotMeta({ts:cached?.ts||Date.now(),count:cachedItems.length,source:sourceLabel(cachedWeb),status:'fallback',error:`${message}. Visualizzo cache e segnali locali.`});
+      }else{
+        const fallback=combineItems([]);
+        setHotData(fallback);
+        setHotMeta({ts:Date.now(),count:fallback.length,source:'catalogo locale',status:'fallback',error:`${message}. Nessuna fonte web disponibile, uso il catalogo.`});
       }
-      const fallback=hotDedup(hotLocalInsights).sort((a,b)=>(b.score||0)-(a.score||0)).slice(0,hotSettings.maxItems);
-      setHotData(fallback);
-      setHotMeta({ts:Date.now(),count:fallback.length,source:'catalogo locale',status:'fallback',error:`${message}. Nessuna fonte web disponibile, uso il catalogo.`});
-      return fallback;
     }finally{
       hotAbortRef.current=null;
       if(!silent)setHotLoading(false);
     }
-  },[fetchGoogleBooksHot,hotLocalInsights,hotSettings,hotStaleMs]);
+  },[hotSettings,hotLocalInsights,hotStaleMs,fetchGoogleBooksHot,isOnline]);
 
   useEffect(()=>{if(tab==='hot')loadHot({force:false})},[tab,loadHot]);
   useEffect(()=>{
-    const onVisible=()=>{if(document.visibilityState==='visible'&&tab==='hot')loadHot({force:false,silent:true})};
-    const onFocus=()=>{if(tab==='hot')loadHot({force:false,silent:true})};
-    const onOnline=()=>{if(tab==='hot')loadHot({force:true,silent:true})};
-    document.addEventListener('visibilitychange',onVisible);
+    if(tab!=='hot')return;
+    const onVisible=()=>{if(document.visibilityState==='visible')loadHot({force:false,silent:true})};
+    const onFocus=()=>loadHot({force:false,silent:true});
+    const onOnline=()=>loadHot({force:true,silent:true});
     window.addEventListener('focus',onFocus);
     window.addEventListener('online',onOnline);
+    document.addEventListener('visibilitychange',onVisible);
     return()=>{
-      document.removeEventListener('visibilitychange',onVisible);
       window.removeEventListener('focus',onFocus);
       window.removeEventListener('online',onOnline);
+      document.removeEventListener('visibilitychange',onVisible);
     };
   },[tab,loadHot]);
+  useEffect(()=>{
+    if(tab==='hot'&&hotSettings.mode!=='web')loadHot({force:false,silent:true});
+  },[tab,hotSettings.mode,hotLocalInsights,loadHot]);
   useEffect(()=>{
     if(tab!=='hot'||!hotSettings.autoRefreshMinutes)return;
     const id=setInterval(()=>loadHot({force:true,silent:true}),hotSettings.autoRefreshMinutes*60000);
@@ -688,12 +694,13 @@ function App(){
       <div className="hot-refresh">
         <div className="hot-head">
           <h2>🔥 HOT - Novità e Trend</h2>
-          <div className="hot-sub">Motore ibrido robusto: aggiorna dal web quando possibile e ripiega sul tuo catalogo quando serve.</div>
+          <div className="hot-sub">Radar robusto: usa il web quando disponibile, cache persistente quando serve e segnali interni del tuo catalogo in tempo reale.</div>
           <div className="hot-meta">
             <span className={`hot-state ${stateClass}`}>{hotLoading?'Aggiornamento…':hotMeta.status==='fallback'?'Fallback attivo':'Pronto'}</span>
             <span className="hot-pill">Fonte: {hotMeta.source||'—'}</span>
             <span className="hot-pill">Ultimo update: {hotMeta.ts?`${hotFmtDate(new Date(hotMeta.ts).toISOString())} · ${hotTimeAgo(hotMeta.ts)}`:'mai'}</span>
-            {!navigator.onLine&&<span className="hot-pill">Offline</span>}
+            <span className="hot-pill">Card: {hotData.length||0}</span>
+            {!isOnline&&<span className="hot-pill">Offline</span>}
           </div>
         </div>
         <div className="hot-actions">
@@ -702,6 +709,7 @@ function App(){
           <button className="btn bs bg" onClick={clearHotCache}>🧹 Cache</button>
         </div>
       </div>
+
       <div className="hot-controls">
         <select value={hotSettings.mode} onChange={e=>setHotSettings(s=>({...s,mode:e.target.value}))}>
           <option value="hybrid">Modalità: Ibrida</option>
@@ -724,9 +732,13 @@ function App(){
           <option value={16}>Card: 16</option>
         </select>
       </div>
+
       {hotMeta.error&&<div className="hot-alert">{hotMeta.error}</div>}
-      {hotLoading&&!hotData.length?<div className="hot-loading"><div className="hot-spinner"></div><p style={{marginTop:8}}>Sto ricostruendo il radar Hot…</p></div>:
-        hotData.length?<div className="hot-grid">{hotData.map((item,i)=>(
+
+      {hotLoading&&!hotData.length?
+        <div className="hot-loading"><div className="hot-spinner"></div><p style={{marginTop:8}}>Sto ricostruendo il radar Hot…</p></div>
+      :hotData.length?
+        <div className="hot-grid">{hotData.map((item,i)=>(
           <div key={item.key||i} className="hot-card">
             <div className="hot-card-top">
               <h4><span className={`hot-tag ${item.tag}`}>{hotLabel(item.tag)}</span>{item.title}</h4>
@@ -739,7 +751,8 @@ function App(){
               {item.url&&<a className="hot-link" href={item.url} target="_blank" rel="noreferrer">Apri scheda ↗</a>}
             </div>
           </div>
-        ))}</div>:<div className="emp">Nessun insight disponibile. Prova un aggiornamento manuale o passa alla modalità catalogo.</div>}
+        ))}</div>
+      :<div className="emp">Nessun insight disponibile. Prova un aggiornamento manuale o passa alla modalità catalogo.</div>}
     </>
   )};
 
