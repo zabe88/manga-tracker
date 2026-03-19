@@ -136,7 +136,7 @@ body{background:var(--bg);color:var(--txt);font-family:'DM Sans',sans-serif;-web
 .scan-pill.info{background:rgba(54,124,255,.1);color:var(--blu);border-color:rgba(54,124,255,.2)}
 .scan-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .scan-reader{position:relative;border:1px solid var(--brd);border-radius:14px;overflow:hidden;background:#05070a;min-height:280px;height:min(46dvh,420px);max-height:420px}
-.scan-reader:empty::before{content:'Scanner pronto';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px}
+.scan-reader:empty::before{content:'Scanner pronto';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px}.scan-reader video{transform:none!important}
 .scan-reader video{width:100%!important;height:100%!important;object-fit:cover!important;background:#05070a}
 .scan-topbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .scan-topbar select,.scan-topbar input{background:var(--bg);border:1px solid var(--brd);color:var(--txt);padding:10px 12px;border-radius:10px;font-size:14px;font-family:inherit}
@@ -207,7 +207,7 @@ input[type="file"]{display:none}
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script>var defined_SHEETJS=false;</script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://unpkg.com/@ericblade/quagga2@1.12.1/dist/quagga.min.js"></script>
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 window.supabaseLib={createClient};
@@ -891,13 +891,15 @@ function App(){
   const stopScanner=useCallback(async({resetLock=false}={})=>{
     scanBusyRef.current=false;
     setScanRunning(false);
-    const scanner=scanInstanceRef.current;
-    scanInstanceRef.current=null;
-    if(scanner){
-      try{if(typeof scanner.pause==='function')scanner.pause(true)}catch(e){}
-      try{await scanner.stop()}catch(e){}
-      try{await scanner.clear()}catch(e){}
-    }
+    try{
+      if(window.Quagga){
+        if(quaggaDetectedHandlerRef.current){
+          try{window.Quagga.offDetected(quaggaDetectedHandlerRef.current)}catch(e){}
+          quaggaDetectedHandlerRef.current=null;
+        }
+        try{window.Quagga.stop()}catch(e){}
+      }
+    }catch(e){}
     const holder=document.getElementById('scan-reader');
     if(holder)holder.innerHTML='';
     if(resetLock){
@@ -913,13 +915,13 @@ function App(){
   },[]);
 
   const refreshScanCameras=useCallback(async()=>{
-    if(!window.Html5Qrcode?.getCameras)return[];
     try{
-      const devices=await window.Html5Qrcode.getCameras();
-      const cams=Array.isArray(devices)?devices:[];
+      if(!navigator.mediaDevices?.enumerateDevices)return[];
+      const devices=await navigator.mediaDevices.enumerateDevices();
+      const cams=(Array.isArray(devices)?devices:[]).filter(d=>d.kind==='videoinput').map((d,i)=>({id:d.deviceId,label:d.label||`Camera ${i+1}`}));
       setScanCameras(cams);
       if(cams.length && !scanCameraId){
-        const preferred=cams.find(c=>/back|rear|environment|wide/i.test(String(c.label||'')))||cams[0];
+        const preferred=cams.find(c=>/back|rear|environment|wide|ultra/i.test(String(c.label||'')))||cams[0];
         setScanCameraId(preferred.id);
       }
       return cams;
@@ -953,19 +955,17 @@ function App(){
     }finally{setScanBusy(false)}
   },[data,recordScanHistory]);
 
+  const quaggaDetectedHandlerRef=useRef(null);
+
   const onCodeDetected=useCallback(async(decodedText, source='camera')=>{
     const code=digitsOnly(decodedText);
     if(code.length<8)return;
     const now=Date.now();
     if(scanLockRef.current)return;
-    if(lastScanRef.current.code===code && (now-lastScanRef.current.ts)<1800)return;
+    if(lastScanRef.current.code===code && (now-lastScanRef.current.ts)<2200)return;
     scanLockRef.current=true;
     lastScanRef.current={code,ts:now};
     try{navigator.vibrate?.(60)}catch(e){}
-    const scanner=scanInstanceRef.current;
-    if(scanner){
-      try{if(typeof scanner.pause==='function')scanner.pause(true)}catch(e){}
-    }
     await stopScanner();
     await runBarcodeLookup(code, source);
   },[runBarcodeLookup,stopScanner]);
@@ -973,40 +973,45 @@ function App(){
   const startScanner=useCallback(async()=>{
     if(scanBusyRef.current)return;
     if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia){
-      setScanMsg('Fotocamera disponibile solo su HTTPS o localhost. Su GitHub Pages funzionerà.');
+      setScanMsg('Fotocamera disponibile solo su HTTPS o localhost.');
       return;
     }
-    if(!window.Html5Qrcode){
-      setScanMsg('Libreria scanner non caricata. Usa il campo manuale o la scansione da immagine.');
+    if(!window.Quagga){
+      setScanMsg('Motore scanner non caricato.');
       return;
     }
     scanBusyRef.current=true;
-    setScanMsg(isIOS?'Avvio modalità live iPhone… se non aggancia bene usa “Scatta foto barcode”, che su iPhone è più affidabile.':'Avvio scanner…');
+    setScanMsg('Avvio scanner barcode…');
     try{
       await stopScanner({resetLock:true});
       const holder=document.getElementById('scan-reader');
       if(holder)holder.innerHTML='';
-      const scanner=new window.Html5Qrcode('scan-reader', { verbose:false });
-      scanInstanceRef.current=scanner;
+      const streamForLabels=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+      try{streamForLabels.getTracks().forEach(t=>t.stop())}catch(e){}
       const cams=await refreshScanCameras();
-      const config={
-        fps:isIOS?8:12,
-        qrbox:(vw,vh)=>({width:Math.max(210,Math.min(vw*0.82,320)),height:Math.max(105,Math.min(vh*0.3,150))}),
-        aspectRatio:isIOS?1.333:1.777,
-        disableFlip:isIOS,
-        rememberLastUsedCamera:true,
-        formatsToSupport:window.Html5QrcodeSupportedFormats?[
-          window.Html5QrcodeSupportedFormats.EAN_13,
-          window.Html5QrcodeSupportedFormats.EAN_8,
-          window.Html5QrcodeSupportedFormats.UPC_A,
-          window.Html5QrcodeSupportedFormats.UPC_E,
-          window.Html5QrcodeSupportedFormats.CODE_128
-        ]:undefined,
-        experimentalFeatures:{useBarCodeDetectorIfSupported:!isIOS}
+      const constraints=scanCameraId?{deviceId:{exact:scanCameraId}}:{facingMode:'environment'};
+      const readers=['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader'];
+      await new Promise((resolve,reject)=>{
+        window.Quagga.init({
+          inputStream:{
+            type:'LiveStream',
+            target:holder,
+            constraints:{...constraints,width:{ideal:1280},height:{ideal:720},focusMode:'continuous'}
+          },
+          locator:{patchSize:isIOS?'medium':'large',halfSample:true},
+          numOfWorkers:Math.max(1,Math.min(2,navigator.hardwareConcurrency||2)),
+          frequency:isIOS?8:10,
+          decoder:{readers},
+          locate:true
+        },function(err){ if(err) reject(err); else resolve(); });
+      });
+      const detected=(result)=>{
+        const code=result?.codeResult?.code||'';
+        if(code) onCodeDetected(code,'camera');
       };
-      const preferredCameraId=(cams.find(c=>/back|rear|environment|wide/i.test(String(c.label||'')))?.id)||scanCameraId||'';
-      const chosen=isIOS?{facingMode:'environment'}:(scanCameraId||preferredCameraId||{facingMode:'environment'});
-      await scanner.start(chosen, config, (decodedText)=>{onCodeDetected(decodedText,'camera')}, ()=>{});
+      quaggaDetectedHandlerRef.current=detected;
+      window.Quagga.onDetected(detected);
+      window.Quagga.start();
       const video=document.querySelector('#scan-reader video');
       if(video){
         video.setAttribute('playsinline','true');
@@ -1015,10 +1020,11 @@ function App(){
         video.autoplay=true;
       }
       setScanRunning(true);
-      setScanMsg(isIOS?'Scanner live attivo su iPhone. Se non legge al primo colpo usa “Scatta foto barcode”.':'Scanner attivo. Inquadra il barcode o usa una foto.');
+      setScanMsg(cams.length?'Scanner attivo. Inquadra il barcode e tienilo fermo per un secondo.':'Scanner attivo. Consenti la camera posteriore e prova con buona luce.');
     }catch(err){
-      setScanMsg((isIOS?'Impossibile avviare la live camera su iPhone. Usa “Scatta foto barcode”. Errore: ':'Impossibile avviare la fotocamera: ')+(err?.message||String(err)));
       setScanRunning(false);
+      setScanMsg('Impossibile avviare la fotocamera scanner: '+(err?.message||String(err)));
+      try{ if(window.Quagga){ window.Quagga.stop(); }}catch(e){}
     }finally{
       scanBusyRef.current=false;
     }
@@ -1031,27 +1037,27 @@ function App(){
     setScanMsg('Analizzo immagine…');
     try{
       await stopScanner({resetLock:true});
-      if(window.Html5Qrcode){
-        const holder=document.getElementById('scan-reader');
-        if(holder)holder.innerHTML='';
-        const scanner=new window.Html5Qrcode('scan-reader', { verbose:false });
-        scanInstanceRef.current=scanner;
-        const decoded=await scanner.scanFile(file, true);
-        try{await scanner.clear()}catch(e){}
-        scanInstanceRef.current=null;
-        await onCodeDetected(decoded,'image');
-      }else if(window.BarcodeDetector){
-        const bmp=await createImageBitmap(file);
-        const detector=new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128']});
-        const found=await detector.detect(bmp);
-        const code=digitsOnly(found?.[0]?.rawValue||'');
-        if(code.length<8)throw new Error('Nessun barcode leggibile nella foto.');
-        await onCodeDetected(code,'image');
-      }else{
-        throw new Error('Scanner da immagine non disponibile su questo browser.');
-      }
+      const url=URL.createObjectURL(file);
+      const readers=['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader'];
+      const result=await new Promise((resolve,reject)=>{
+        if(window.Quagga?.decodeSingle){
+          window.Quagga.decodeSingle({
+            src:url,
+            numOfWorkers:0,
+            inputStream:{size:1280,singleChannel:false},
+            locator:{patchSize:'medium',halfSample:false},
+            decoder:{readers},
+            locate:true
+          },data=>{
+            if(data?.codeResult?.code) resolve(data.codeResult.code);
+            else reject(new Error('Nessun barcode leggibile nella foto.'));
+          });
+        }else reject(new Error('Motore scansione immagine non disponibile.'));
+      });
+      URL.revokeObjectURL(url);
+      await onCodeDetected(result,'image');
     }catch(err){
-      setScanMsg('Foto non leggibile: '+(err?.message||String(err)));
+      setScanMsg('Foto non leggibile: '+(err?.message||String(err))+'. Prova a riempire l'immagine col barcode e a evitare riflessi.');
     }finally{
       setScanBusy(false);
       if(e.target)e.target.value='';
@@ -1065,7 +1071,7 @@ function App(){
       setScanResult(null);
       setScanBusy(false);
       setScanRunning(false);
-      setScanMsg(isIOS?'Su iPhone la modalità più affidabile è “Scatta foto barcode”. La live camera resta disponibile come prova.' :'Apri la fotocamera oppure usa una foto del barcode.');
+      setScanMsg('Apri la live camera oppure usa una foto del barcode.');
     }else stopScanner({resetLock:true});
   },[isIOS,showScan,stopScanner]);
 
@@ -1501,23 +1507,21 @@ function App(){
       </div>}
 
       {showScan&&<div className="mo" onClick={()=>{stopScanner({resetLock:true});setShowScan(false)}}><div className="md scan-modal" onClick={e=>e.stopPropagation()}>
-        <h3>Scanner ISBN / EAN avanzato</h3>
+        <h3>Scanner ISBN / EAN</h3>
         <div className="scan-box">
-          <div className="scan-tip">Dopo la prima lettura lo scanner si blocca subito, così eviti loop o doppie acquisizioni. Su iPhone la modalità più affidabile è la foto del barcode; la live camera resta disponibile come prova.</div>
+          <div className="scan-tip">La camera ora si blocca alla prima lettura valida. Modalità live ottimizzata per Android e iPhone; se non aggancia, usa foto barcode.</div>
           <div className="scan-topbar">
             <span className="scan-mode-pill">{scanRunning?'🟢 Scanner attivo':'⚪ Scanner fermo'}</span>
-            {!isIOS&&<button className="btn bb" onClick={startScanner}>{scanRunning?'🔄 Riavvia':'🎥 Avvia fotocamera'}</button>}
-            {isIOS&&<button className="btn bb" onClick={()=>scanFileRef.current?.click()}>📷 Scatta foto barcode</button>}
-            {isIOS&&<button className="btn ba" onClick={startScanner}>{scanRunning?'🔄 Riavvia live':'🧪 Prova live iPhone'}</button>}
+            <button className="btn bb" onClick={startScanner}>{scanRunning?'🔄 Riavvia live':'🎥 Avvia live'}</button>
+            <button className="btn ba" onClick={()=>scanFileRef.current?.click()}>📷 Usa foto</button>
             <button className="btn bg" onClick={()=>stopScanner({resetLock:false})}>⏸ Ferma</button>
-            {!isIOS&&<button className="btn ba" onClick={()=>scanFileRef.current?.click()}>🖼 Usa foto</button>}
             <input ref={scanFileRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={handleScanFileChange}/>
             {(!isIOS || scanCameras.length>0) && <select value={scanCameraId} onChange={e=>setScanCameraId(e.target.value)}><option value="">Camera automatica</option>{scanCameras.map(cam=><option key={cam.id} value={cam.id}>{cam.label||`Camera ${cam.id.slice(0,6)}`}</option>)}</select>}
           </div>
           <div className="scan-grid">
             <div>
               <div id="scan-reader" className="scan-reader"></div>
-              <div className="scan-stat" style={{marginTop:8}}>Suggerimento: tieni il volume fermo, riempi il riquadro con il barcode e usa luce uniforme. Dopo una lettura valida la camera si ferma da sola. Su iPhone, se la live non aggancia bene, usa la foto del barcode.</div>
+              <div className="scan-stat" style={{marginTop:8}}>Suggerimento: avvicina il codice fino a riempire buona parte dell'inquadratura, evita riflessi e resta fermo 1 secondo. Se non legge, usa una foto ravvicinata del barcode.</div>
               <div className="scan-inline" style={{marginTop:10}}>
                 <input value={scanCode} onChange={e=>setScanCode(e.target.value)} placeholder="Inserisci ISBN / EAN manualmente" inputMode="numeric" style={{flex:'1 1 220px',background:'var(--bg)',border:'1px solid var(--brd)',color:'var(--txt)',padding:'10px 12px',borderRadius:10,fontSize:14,fontFamily:'inherit'}}/>
                 <button className="btn ba" onClick={()=>{scanLockRef.current=true;runBarcodeLookup(scanCode,'manual')}} disabled={scanBusy}>{scanBusy?'Cerco…':'Cerca codice'}</button>
@@ -1548,7 +1552,7 @@ function App(){
               <div className="scan-editor-cta">
                 <button className="btn bgrn" onClick={()=>applyScanDelta('load')} disabled={!scanResult}>📥 Carica +{scanQty}</button>
                 <button className="btn bg" onClick={()=>applyScanDelta('unload')} disabled={!scanResult||!scanResult.match}>📤 Scarica -{scanQty}</button>
-                <button className="btn bb" onClick={()=>{stopScanner({resetLock:true});setScanCode('');setScanResult(null);setScanMsg(isIOS?'Pronto per una nuova lettura. Su iPhone conviene “Scatta foto barcode”.':'Pronto per una nuova lettura.');}}>🔄 Nuova scansione</button>
+                <button className="btn bb" onClick={()=>{stopScanner({resetLock:true});setScanCode('');setScanResult(null);setScanMsg('Pronto per una nuova lettura.');}}>🔄 Nuova scansione</button>
               </div>
               <div>
                 <div className="scan-mini-actions" style={{justifyContent:'space-between',marginBottom:8}}>
