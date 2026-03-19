@@ -233,11 +233,40 @@ function gm(h,mx){const m=[];for(let i=1;i<=mx;i++)if(!h.includes(i))m.push(i);r
 function coverUrl(ean){if(!ean||ean==='None'||ean==='nan'||String(ean).length<10)return null;return 'https://books.google.com/books/content?vid=isbn:'+ean+'&printsec=frontcover&img=1&zoom=1'}
 function safeParse(v,fallback){try{const p=JSON.parse(v);return p??fallback}catch{return fallback}}
 function stable(v){try{return JSON.stringify(v)}catch{return ''}}
-function readCloudCfg(){
-  const raw=safeParse(localStorage.getItem(K_CFG),{url:'',key:'',allowSignup:false});
-  return{url:String(raw.url||''),key:String(raw.key||''),allowSignup:!!raw.allowSignup};
+const EMBEDDED_CLOUD_CFG=Object.freeze({
+  url:'https://khcmzqwhamwggjevorog.supabase.co',
+  key:'sb_publishable_XT-N8g37FeEAWkIjU6zpPA_7NU5Ao1s',
+  allowSignup:false,
+  locked:true
+});
+function cleanSupabaseUrl(url){
+  return String(url||'').trim().replace(/\/+$/,'');
 }
-function saveCloudCfg(cfg){localStorage.setItem(K_CFG,JSON.stringify({url:String(cfg.url||'').trim(),key:String(cfg.key||'').trim(),allowSignup:!!cfg.allowSignup}))}
+function mergeCloudCfg(raw){
+  const merged={...EMBEDDED_CLOUD_CFG,...(raw&&typeof raw==='object'?raw:{})};
+  return {
+    url:cleanSupabaseUrl(merged.url||''),
+    key:String(merged.key||'').trim(),
+    allowSignup:typeof merged.allowSignup==='boolean'?merged.allowSignup:!!EMBEDDED_CLOUD_CFG.allowSignup,
+    locked:merged.locked!==false
+  };
+}
+function readCloudCfg(){
+  const raw=safeParse(localStorage.getItem(K_CFG),{});
+  return mergeCloudCfg(raw);
+}
+function saveCloudCfg(cfg){
+  const next=mergeCloudCfg(cfg);
+  localStorage.setItem(K_CFG,JSON.stringify(next));
+}
+function isNetworkFetchError(err){
+  const msg=String(err?.message||err||'');
+  return err?.name==='TypeError' || /failed to fetch|load failed|networkerror|network request failed/i.test(msg);
+}
+function cloudFetchHint(url){
+  const host=cleanSupabaseUrl(url)||'il progetto Supabase';
+  return `Connessione fallita verso ${host}. Controlla URL esatto, progetto non in pausa, rete del telefono, VPN/adblock e che la chiave sia publishable/anon.`;
+}
 function normalizePayload(payload){
   const base=payload&&typeof payload==='object'?payload:{};
   const data=Array.isArray(base.data)&&base.data.length?base.data:prep();
@@ -311,7 +340,7 @@ function App(){
   const[supabase,setSupabase]=useState(null);
   const[session,setSession]=useState(null);
   const[remoteLoaded,setRemoteLoaded]=useState(false);
-  const[cloudInfo,setCloudInfo]=useState({tone:'muted',title:'Modalità locale',text:'Configura Supabase per trasformare l’app in memoria condivisa reale.'});
+  const[cloudInfo,setCloudInfo]=useState({tone:'info',title:'Cloud preconfigurato',text:'Il collegamento Supabase è già incluso nel file. Serve solo accedere.'});
   const[showAuth,setShowAuth]=useState(false);
   const[authMode,setAuthMode]=useState('signin');
   const[authForm,setAuthForm]=useState({email:'',password:''});
@@ -374,11 +403,11 @@ function App(){
       setSupabase(null);
       setSession(null);
       setRemoteLoaded(false);
-      setCloudInfo({tone:'muted',title:'Modalità locale',text:'Configura URL e chiave publishable/anon di Supabase per avere dati condivisi per tutti.'});
+      setCloudInfo({tone:'warn',title:'Cloud disattivato',text:'La configurazione incorporata è stata rimossa da questo dispositivo. Ripristino i valori predefiniti del file.'});
       return;
     }
     try{
-      const client=window.supabaseLib.createClient(cloudCfg.url,cloudCfg.key,{
+      const client=window.supabaseLib.createClient(cleanSupabaseUrl(cloudCfg.url),cloudCfg.key,{
         auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
       });
       if(cancelled)return;
@@ -445,52 +474,62 @@ function App(){
     if(!supabase||!session)return;
     const payload=normalizePayload(payloadOverride||cloudPayloadRef.current);
     setCloudInfo({tone:'info',title:'Sincronizzazione in corso',text:'Invio le modifiche al database condiviso…'});
-    const {data:row,error}=await supabase
-      .from('app_state')
-      .upsert({id:CLOUD_ROW_ID,payload,updated_by:session.user.id},{onConflict:'id'})
-      .select('updated_at,payload')
-      .single();
-    if(error){
-      setCloudInfo({tone:'error',title:'Sync fallita',text:error.message||'Controlla tabelle, RLS e chiave Supabase.'});
-      return;
+    try{
+      const {data:row,error}=await supabase
+        .from('app_state')
+        .upsert({id:CLOUD_ROW_ID,payload,updated_by:session.user.id},{onConflict:'id'})
+        .select('updated_at,payload')
+        .single();
+      if(error){
+        setCloudInfo({tone:'error',title:'Sync fallita',text:error.message||'Controlla tabelle, RLS e chiave Supabase.'});
+        return;
+      }
+      const nextPayload=normalizePayload((row&&row.payload)||payload);
+      lastRemoteRef.current=stable(nextPayload);
+      if(row&&row.updated_at){
+        const t=new Date(row.updated_at).toLocaleString('it-IT');
+        localStorage.setItem(K_TS,t);
+        setTs(t);
+      }
+      setCloudInfo({tone:'ok',title:'Cloud sincronizzato',text:'Le modifiche sono ora persistenti per tutti gli utenti autorizzati.'});
+    }catch(err){
+      const msg=isNetworkFetchError(err)?cloudFetchHint(cloudCfg.url):(err?.message||'Errore inatteso durante la sincronizzazione cloud.');
+      setCloudInfo({tone:'error',title:'Sync cloud non raggiungibile',text:msg});
     }
-    const nextPayload=normalizePayload((row&&row.payload)||payload);
-    lastRemoteRef.current=stable(nextPayload);
-    if(row&&row.updated_at){
-      const t=new Date(row.updated_at).toLocaleString('it-IT');
-      localStorage.setItem(K_TS,t);
-      setTs(t);
-    }
-    setCloudInfo({tone:'ok',title:'Cloud sincronizzato',text:'Le modifiche sono ora persistenti per tutti gli utenti autorizzati.'});
-  },[supabase,session]);
+  },[supabase,session,cloudCfg.url]);
 
   const loadRemote=useCallback(async()=>{
     if(!supabase||!session)return;
     setCloudInfo({tone:'info',title:'Caricamento cloud',text:'Sto leggendo lo stato condiviso…'});
-    const {data:row,error}=await supabase
-      .from('app_state')
-      .select('id,payload,updated_at')
-      .eq('id',CLOUD_ROW_ID)
-      .maybeSingle();
-    if(error){
-      setCloudInfo({tone:'error',title:'Lettura cloud fallita',text:error.message||'Verifica tabella public.app_state e policy RLS.'});
-      return;
-    }
-    if(!row){
-      const initialPayload=normalizePayload(cloudPayloadRef.current);
-      lastRemoteRef.current=stable(initialPayload);
-      await pushRemote(initialPayload);
+    try{
+      const {data:row,error}=await supabase
+        .from('app_state')
+        .select('id,payload,updated_at')
+        .eq('id',CLOUD_ROW_ID)
+        .maybeSingle();
+      if(error){
+        setCloudInfo({tone:'error',title:'Lettura cloud fallita',text:error.message||'Verifica tabella public.app_state e policy RLS.'});
+        return;
+      }
+      if(!row){
+        const initialPayload=normalizePayload(cloudPayloadRef.current);
+        lastRemoteRef.current=stable(initialPayload);
+        await pushRemote(initialPayload);
+        setRemoteLoaded(true);
+        startRealtime(supabase);
+        return;
+      }
+      const normalized=normalizePayload(row.payload);
+      lastRemoteRef.current=stable(normalized);
+      applyRemotePayload(normalized,row.updated_at);
       setRemoteLoaded(true);
+      setCloudInfo({tone:'ok',title:'Cloud collegato',text:'Stai lavorando sullo stato condiviso centrale.'});
       startRealtime(supabase);
-      return;
+    }catch(err){
+      const msg=isNetworkFetchError(err)?cloudFetchHint(cloudCfg.url):(err?.message||'Errore inatteso durante la lettura cloud.');
+      setCloudInfo({tone:'error',title:'Cloud non raggiungibile',text:msg});
     }
-    const normalized=normalizePayload(row.payload);
-    lastRemoteRef.current=stable(normalized);
-    applyRemotePayload(normalized,row.updated_at);
-    setRemoteLoaded(true);
-    setCloudInfo({tone:'ok',title:'Cloud collegato',text:'Stai lavorando sullo stato condiviso centrale.'});
-    startRealtime(supabase);
-  },[supabase,session,pushRemote,applyRemotePayload,startRealtime]);
+  },[supabase,session,pushRemote,applyRemotePayload,startRealtime,cloudCfg.url]);
 
   useEffect(()=>{
     if(!supabase||!session){
@@ -566,7 +605,7 @@ function App(){
   function loadBackup(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.data&&Array.isArray(d.data)){if(confirm(`${d.data.length} serie trovate. Sostituire?`)){setData(d.data);if(d.favs)setFavs(d.favs);if(d.cart)setCart(d.cart);setExp(null)}}else if(Array.isArray(d)){if(confirm(`${d.length} serie. Sostituire?`)){setData(d);setExp(null)}}}catch(err){alert('Errore: '+err.message)}};r.readAsText(f);e.target.value=''}
 
   async function handleAuthSubmit(modeOverride){
-    if(!supabase){setAuthMsg('Configura prima Supabase nel pannello Cloud.');return}
+    if(!supabase){setAuthMsg('Il client cloud si sta ancora inizializzando. Riprova tra un istante.');return}
     if(!authForm.email.trim()||!authForm.password){setAuthMsg('Inserisci email e password.');return}
     setAuthMsg('Invio richiesta…');
     try{
@@ -580,7 +619,9 @@ function App(){
         if(error)throw error;
         setAuthMsg('Registrazione inviata. Se la conferma email è attiva, verifica la casella.');
       }
-    }catch(err){setAuthMsg(err.message||'Errore di autenticazione.')}
+    }catch(err){
+      setAuthMsg(isNetworkFetchError(err)?cloudFetchHint(cloudCfg.url):(err.message||'Errore di autenticazione.'))
+    }
   }
   async function handleLogout(){
     if(!supabase)return;
@@ -590,7 +631,7 @@ function App(){
   }
 
   function saveCloudSettings(){
-    const next={url:(cloudDraft.url||'').trim(),key:(cloudDraft.key||'').trim(),allowSignup:!!cloudDraft.allowSignup};
+    const next=mergeCloudCfg({url:cleanSupabaseUrl(cloudDraft.url||''),key:(cloudDraft.key||'').trim(),allowSignup:!!cloudDraft.allowSignup});
     saveCloudCfg(next);
     setCloudCfg(next);
     setCloudDraft(next);
@@ -598,10 +639,10 @@ function App(){
     setShowCloud(false);
   }
   function clearCloudSettings(){
-    if(!confirm('Rimuovere la configurazione cloud da questo dispositivo?'))return;
+    if(!confirm('Ripristinare la configurazione cloud incorporata in questo file?'))return;
     localStorage.removeItem(K_CFG);
-    const blank={url:'',key:'',allowSignup:false};
-    setCloudCfg(blank);setCloudDraft(blank);setShowCloud(false);setAuthMsg('');
+    const embedded=mergeCloudCfg({});
+    setCloudCfg(embedded);setCloudDraft(embedded);setShowCloud(false);setAuthMsg('');
   }
   function copySetupSQL(){navigator.clipboard?.writeText(SUPABASE_SQL)}
 
@@ -817,6 +858,7 @@ function App(){
         <div className="fd"><label>Publishable / anon key</label><input type="password" value={cloudDraft.key} onChange={e=>setCloudDraft(d=>({...d,key:e.target.value}))} placeholder="sb_publishable_... oppure anon key"/></div>
         <label className="cloud-check"><input type="checkbox" checked={!!cloudDraft.allowSignup} onChange={e=>setCloudDraft(d=>({...d,allowSignup:e.target.checked}))}/>Mostra anche il pulsante Registrati nell’app</label>
         <div className="auth-note">Prima di usare il cloud, esegui lo schema SQL di base in Supabase SQL Editor e abilita almeno l’email/password in Authentication. Se vuoi che possano entrare solo utenti invitati da te, lascia disattivato “Registrati”.</div>
+        <div className="cloud-help">Se compare <span className="cloud-kbd">Failed to fetch</span>, nella pratica è quasi sempre uno di questi casi: URL progetto errato, progetto Supabase in pausa, rete del telefono che blocca <span className="cloud-kbd">*.supabase.co</span>, oppure chiave sbagliata.</div>
         <div className="cloud-sql">{SUPABASE_SQL}</div>
         <div className="mb" style={{flexWrap:'wrap'}}>
           <button className="btn bb" onClick={copySetupSQL}>Copia SQL base</button>
