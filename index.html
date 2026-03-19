@@ -207,7 +207,8 @@ input[type="file"]{display:none}
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script>var defined_SHEETJS=false;</script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/@ericblade/quagga2@1.12.1/dist/quagga.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.21.3"></script>
+<script src="https://unpkg.com/@zxing/browser@0.1.5"></script>
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 window.supabaseLib={createClient};
@@ -891,17 +892,10 @@ function App(){
   const stopScanner=useCallback(async({resetLock=false}={})=>{
     scanBusyRef.current=false;
     setScanRunning(false);
-    try{
-      if(window.Quagga){
-        if(quaggaDetectedHandlerRef.current){
-          try{window.Quagga.offDetected(quaggaDetectedHandlerRef.current)}catch(e){}
-          quaggaDetectedHandlerRef.current=null;
-        }
-        try{window.Quagga.stop()}catch(e){}
-      }
-    }catch(e){}
-    const holder=document.getElementById('scan-reader');
-    if(holder)holder.innerHTML='';
+    try{zxingControlsRef.current?.stop?.()}catch(e){}
+    zxingControlsRef.current=null;
+    const video=document.getElementById('scan-video');
+    try{ if(video?.srcObject){ video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject=null; } }catch(e){}
     if(resetLock){
       scanLockRef.current=false;
       lastScanRef.current={code:'',ts:0};
@@ -955,17 +949,29 @@ function App(){
     }finally{setScanBusy(false)}
   },[data,recordScanHistory]);
 
-  const quaggaDetectedHandlerRef=useRef(null);
+  const zxingReaderRef=useRef(null);
+  const zxingControlsRef=useRef(null);
+
+  const ensureZXingReader=useCallback(()=>{
+    if(!window.ZXingBrowser){
+      throw new Error('Motore scanner non caricato.');
+    }
+    if(!zxingReaderRef.current){
+      zxingReaderRef.current = new window.ZXingBrowser.BrowserMultiFormatReader();
+    }
+    return zxingReaderRef.current;
+  },[]);
 
   const onCodeDetected=useCallback(async(decodedText, source='camera')=>{
     const code=digitsOnly(decodedText);
     if(code.length<8)return;
     const now=Date.now();
     if(scanLockRef.current)return;
-    if(lastScanRef.current.code===code && (now-lastScanRef.current.ts)<2200)return;
+    if(lastScanRef.current.code===code && (now-lastScanRef.current.ts)<2500)return;
     scanLockRef.current=true;
     lastScanRef.current={code,ts:now};
     try{navigator.vibrate?.(60)}catch(e){}
+    setScanMsg('Codice rilevato: '+code);
     await stopScanner();
     await runBarcodeLookup(code, source);
   },[runBarcodeLookup,stopScanner]);
@@ -976,59 +982,52 @@ function App(){
       setScanMsg('Fotocamera disponibile solo su HTTPS o localhost.');
       return;
     }
-    if(!window.Quagga){
-      setScanMsg('Motore scanner non caricato.');
-      return;
-    }
     scanBusyRef.current=true;
     setScanMsg('Avvio scanner barcode…');
     try{
       await stopScanner({resetLock:true});
-      const holder=document.getElementById('scan-reader');
-      if(holder)holder.innerHTML='';
+      const video=document.getElementById('scan-video');
+      if(!video) throw new Error('Elemento video scanner non trovato.');
       const streamForLabels=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
       try{streamForLabels.getTracks().forEach(t=>t.stop())}catch(e){}
       const cams=await refreshScanCameras();
-      const constraints=scanCameraId?{deviceId:{exact:scanCameraId}}:{facingMode:'environment'};
-      const readers=['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader'];
-      await new Promise((resolve,reject)=>{
-        window.Quagga.init({
-          inputStream:{
-            type:'LiveStream',
-            target:holder,
-            constraints:{...constraints,width:{ideal:1280},height:{ideal:720},focusMode:'continuous'}
-          },
-          locator:{patchSize:isIOS?'medium':'large',halfSample:true},
-          numOfWorkers:Math.max(1,Math.min(2,navigator.hardwareConcurrency||2)),
-          frequency:isIOS?8:10,
-          decoder:{readers},
-          locate:true
-        },function(err){ if(err) reject(err); else resolve(); });
-      });
-      const detected=(result)=>{
-        const code=result?.codeResult?.code||'';
-        if(code) onCodeDetected(code,'camera');
+      const constraints={
+        video:{
+          ...(scanCameraId?{deviceId:{exact:scanCameraId}}:{facingMode:{ideal:'environment'}}),
+          width:{ideal:1920},
+          height:{ideal:1080},
+          aspectRatio:{ideal:1.7777778}
+        },
+        audio:false
       };
-      quaggaDetectedHandlerRef.current=detected;
-      window.Quagga.onDetected(detected);
-      window.Quagga.start();
-      const video=document.querySelector('#scan-reader video');
-      if(video){
-        video.setAttribute('playsinline','true');
-        video.setAttribute('muted','true');
-        video.muted=true;
-        video.autoplay=true;
-      }
+      const reader=ensureZXingReader();
+      const controls = await reader.decodeFromConstraints(constraints, video, (result, err, ctrls)=>{
+        if(result?.getText){
+          const text=result.getText();
+          onCodeDetected(text,'camera');
+          return;
+        }
+        const name=err?.name||'';
+        if(name && !/NotFoundException|ChecksumException|FormatException/.test(name)){
+          setScanMsg('Scanner attivo ma la lettura ha restituito: '+name);
+        }
+      });
+      zxingControlsRef.current=controls;
+      video.setAttribute('playsinline','true');
+      video.setAttribute('muted','true');
+      video.muted=true;
+      video.autoplay=true;
       setScanRunning(true);
-      setScanMsg(cams.length?'Scanner attivo. Inquadra il barcode e tienilo fermo per un secondo.':'Scanner attivo. Consenti la camera posteriore e prova con buona luce.');
+      setScanMsg(cams.length?'Scanner attivo. Riempi il riquadro con il codice principale EAN e tienilo fermo per 1 secondo.':'Scanner attivo. Consenti la camera posteriore e prova con buona luce.');
     }catch(err){
       setScanRunning(false);
       setScanMsg('Impossibile avviare la fotocamera scanner: '+(err?.message||String(err)));
-      try{ if(window.Quagga){ window.Quagga.stop(); }}catch(e){}
+      try{zxingControlsRef.current?.stop?.()}catch(e){}
+      zxingControlsRef.current=null;
     }finally{
       scanBusyRef.current=false;
     }
-  },[isIOS,onCodeDetected,refreshScanCameras,scanCameraId,stopScanner]);
+  },[ensureZXingReader,onCodeDetected,refreshScanCameras,scanCameraId,stopScanner]);
 
   async function handleScanFileChange(e){
     const file=e.target.files?.[0];
@@ -1037,25 +1036,13 @@ function App(){
     setScanMsg('Analizzo immagine…');
     try{
       await stopScanner({resetLock:true});
+      const reader=ensureZXingReader();
       const url=URL.createObjectURL(file);
-      const readers=['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader'];
-      const result=await new Promise((resolve,reject)=>{
-        if(window.Quagga?.decodeSingle){
-          window.Quagga.decodeSingle({
-            src:url,
-            numOfWorkers:0,
-            inputStream:{size:1280,singleChannel:false},
-            locator:{patchSize:'medium',halfSample:false},
-            decoder:{readers},
-            locate:true
-          },data=>{
-            if(data?.codeResult?.code) resolve(data.codeResult.code);
-            else reject(new Error('Nessun barcode leggibile nella foto.'));
-          });
-        }else reject(new Error('Motore scansione immagine non disponibile.'));
-      });
+      const result=await reader.decodeFromImageUrl(url);
       URL.revokeObjectURL(url);
-      await onCodeDetected(result,'image');
+      const text=(result?.getText?.()||'');
+      if(!text) throw new Error('Nessun barcode leggibile nella foto.');
+      await onCodeDetected(text,'image');
     }catch(err){
       setScanMsg('Foto non leggibile: '+(err?.message||String(err))+'. Prova a riempire l'immagine col barcode e a evitare riflessi.');
     }finally{
