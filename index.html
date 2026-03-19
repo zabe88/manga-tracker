@@ -115,6 +115,27 @@ body{background:var(--bg);color:var(--txt);font-family:'DM Sans',sans-serif;-web
 .hot-spinner{display:inline-block;width:20px;height:20px;border:2px solid var(--brd);border-top-color:var(--hot);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+/* Scanner */
+.scan-box{display:grid;gap:12px}
+.scan-video-wrap{position:relative;border:1px solid var(--brd);border-radius:14px;overflow:hidden;background:#05070a;min-height:220px}
+.scan-video{width:100%;height:260px;object-fit:cover;background:#05070a;display:block}
+.scan-target{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.scan-target::before{content:'';width:min(74vw,260px);height:120px;border:2px solid rgba(255,255,255,.92);border-radius:14px;box-shadow:0 0 0 9999px rgba(0,0,0,.18)}
+.scan-tip{font-size:11px;color:var(--dim);line-height:1.5}
+.scan-actions{display:flex;gap:8px;flex-wrap:wrap}
+.scan-result{display:flex;gap:12px;align-items:flex-start;padding:12px;border-radius:12px;border:1px solid var(--brd);background:linear-gradient(135deg,#151922,#111318)}
+.scan-cover{width:72px;height:102px;border-radius:10px;object-fit:cover;background:var(--bg);border:1px solid var(--brd)}
+.scan-cover-ph{width:72px;height:102px;border-radius:10px;background:var(--bg);border:1px solid var(--brd);display:flex;align-items:center;justify-content:center;color:var(--dim)}
+.scan-meta{flex:1;min-width:0}
+.scan-meta h4{margin:0 0 6px;font-size:15px;color:var(--txt)}
+.scan-meta .mini{font-size:11px;color:var(--dim);line-height:1.5}
+.scan-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--txt);background:var(--bg);border:1px solid var(--brd);padding:4px 8px;border-radius:999px;display:inline-block;margin-top:6px}
+.scan-pill{display:inline-block;padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700;margin-right:6px;border:1px solid transparent}
+.scan-pill.ok{background:rgba(59,178,115,.12);color:var(--grn);border-color:rgba(59,178,115,.25)}
+.scan-pill.warn{background:rgba(255,184,0,.1);color:var(--yel);border-color:rgba(255,184,0,.2)}
+.scan-pill.info{background:rgba(54,124,255,.1);color:var(--blu);border-color:rgba(54,124,255,.2)}
+.scan-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
 /* Modal */
 .mo{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100;display:flex;align-items:flex-end;justify-content:center}
 .md{background:var(--card);border:1px solid var(--brd);border-radius:16px 16px 0 0;padding:20px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto}
@@ -230,7 +251,52 @@ on conflict (id) do nothing;`;
 
 function prep(){return INIT.map((d,i)=>({...d,id:i,ut:d.tu||d.mx}))}
 function gm(h,mx){const m=[];for(let i=1;i<=mx;i++)if(!h.includes(i))m.push(i);return m}
-function coverUrl(ean){if(!ean||ean==='None'||ean==='nan'||String(ean).length<10)return null;return 'https://books.google.com/books/content?vid=isbn:'+ean+'&printsec=frontcover&img=1&zoom=1'}
+function cleanImg(url){return String(url||'').trim().replace(/^http:/,'https:')}
+function openLibraryCover(ean,size='L'){const code=digitsOnly(ean);return code.length>=10?`https://covers.openlibrary.org/b/isbn/${code}-${size}.jpg?default=false`:null}
+function coverUrl(ean,img){
+  const clean=cleanImg(img);
+  if(clean)return clean;
+  if(!ean||ean==='None'||ean==='nan'||String(ean).length<10)return null;
+  return 'https://books.google.com/books/content?vid=isbn:'+ean+'&printsec=frontcover&img=1&zoom=1';
+}
+function parseScanTitleMeta(rawTitle){
+  const raw=String(rawTitle||'').trim();
+  if(!raw)return{seriesName:'',volume:null,title:''};
+  let title=raw.replace(/\s+/g,' ').trim();
+  let volume=null;
+  const patterns=[/\b(?:vol(?:ume)?|n(?:umero)?|no\.?|#)\s*([0-9]{1,4})\b/i,/\b([0-9]{1,4})\s*$/i,/\b(?:tomo|parte)\s*([0-9]{1,4})\b/i];
+  let match=null;
+  for(const rx of patterns){const m=title.match(rx);if(m){match=m;volume=parseInt(m[1],10);if(Number.isFinite(volume))break}}
+  let seriesName=title;
+  if(match){seriesName=title.replace(match[0],' ').replace(/[\-–—:]+$/,'').replace(/\s+/g,' ').trim()}
+  seriesName=seriesName.replace(/\b(?:manga|graphic novel|fumetto)\b$/i,'').replace(/\s+/g,' ').trim();
+  return{seriesName:seriesName||title,volume:Number.isFinite(volume)&&volume>0?volume:null,title};
+}
+async function lookupBookByIsbn(code){
+  const isbn=digitsOnly(code);
+  if(isbn.length<8)return null;
+  const out={ean:isbn,title:'',publisher:'',price:0,img:'',seriesName:'',volume:null,source:'manual'};
+  try{
+    const res=await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+    if(res.ok){
+      const json=await res.json();
+      const item=json?.items?.[0];
+      if(item){
+        const info=item.volumeInfo||{};
+        out.title=(info.title||'').trim();
+        out.publisher=(info.publisher||'').trim();
+        out.price=parseNum(item.saleInfo?.listPrice?.amount)||0;
+        out.img=cleanImg(info.imageLinks?.thumbnail||info.imageLinks?.smallThumbnail||'');
+        out.source='google_books';
+      }
+    }
+  }catch(e){}
+  const meta=parseScanTitleMeta(out.title||isbn);
+  out.seriesName=meta.seriesName;
+  out.volume=meta.volume;
+  if(!out.img)out.img=openLibraryCover(isbn,'L')||'';
+  return out;
+}
 function safeParse(v,fallback){try{const p=JSON.parse(v);return p??fallback}catch{return fallback}}
 function stable(v){try{return JSON.stringify(v)}catch{return ''}}
 const EMBEDDED_CLOUD_CFG=Object.freeze({
@@ -274,14 +340,149 @@ function normalizePayload(payload){
   const cart=Array.isArray(base.cart)?base.cart:[];
   return{data,favs,cart};
 }
+
+function normTxt(v){
+  return String(v||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+}
+function digitsOnly(v){return String(v||'').replace(/\D+/g,'')}
+function parseNum(v){
+  if(v==null||v==='')return null;
+  if(typeof v==='number'&&Number.isFinite(v))return v;
+  const s=String(v).replace(/\./g,'').replace(',', '.').replace(/[^0-9.-]/g,'');
+  if(!s)return null;
+  const n=Number(s);
+  return Number.isFinite(n)?n:null;
+}
+function parseQty(v){const n=parseNum(v);return n==null?null:Math.max(0,Math.round(Math.abs(n)))}
+function parseDateSmart(v){
+  if(v==null||v==='')return new Date().toISOString().slice(0,10);
+  if(v instanceof Date && !isNaN(v))return v.toISOString().slice(0,10);
+  if(typeof v==='number'&&window.XLSX?.SSF?.parse_date_code){
+    const d=window.XLSX.SSF.parse_date_code(v);
+    if(d&&d.y){
+      const dt=new Date(Date.UTC(d.y,d.m-1,d.d));
+      return dt.toISOString().slice(0,10);
+    }
+  }
+  const s=String(v).trim();
+  const m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+  if(m){
+    const y=m[3].length===2?`20${m[3]}`:m[3];
+    const dt=new Date(`${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}T00:00:00`);
+    if(!isNaN(dt))return dt.toISOString().slice(0,10);
+  }
+  const dt=new Date(s);
+  return isNaN(dt)?new Date().toISOString().slice(0,10):dt.toISOString().slice(0,10);
+}
+function pickField(row,keys){
+  if(!row||typeof row!=='object')return '';
+  const entries=Object.keys(row).map(k=>({raw:k,norm:normTxt(k).replace(/\s+/g,'')}));
+  for(const wanted of keys){
+    const found=entries.find(e=>e.norm.includes(wanted));
+    if(found){
+      const val=row[found.raw];
+      if(val!==''&&val!=null)return val;
+    }
+  }
+  return '';
+}
+function readWorkbookRows(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=()=>reject(new Error('Impossibile leggere il file.'));
+    reader.onload=e=>{
+      try{
+        const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+        const out=[];
+        wb.SheetNames.forEach(sn=>{
+          const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:'',raw:false});
+          rows.forEach(r=>out.push({...r,__sheet:sn}));
+        });
+        resolve(out);
+      }catch(err){reject(err)}
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+function extractWinvRows(rows){
+  const clean=(rows||[]).filter(r=>r&&typeof r==='object'&&Object.values(r).some(v=>String(v??'').trim()!==''));
+  const out=[];
+  clean.forEach((row,idx)=>{
+    const ean=digitsOnly(pickField(row,['ean','isbn','barcode','codiceean','articoloean','codicearticolo','isbn13']));
+    const title=String(pickField(row,['titolo','descrizione','prodotto','articolo','nome'] )||'').trim();
+    const qty=parseQty(pickField(row,['quantita','qta','qty','pezzi','vendute','venduti','venduto','copie']));
+    const stock=parseQty(pickField(row,['giacenza','disponibilita','rimanenza','residuo','stock']));
+    const vol=parseQty(pickField(row,['volume','vol','numero','num']));
+    const date=parseDateSmart(pickField(row,['data','giorno','date','docdata','datadocumento'])||new Date());
+    if(!ean && !title) return;
+    if(qty==null && stock==null) return;
+    out.push({ean,title,qty:qty==null?0:qty,stock,date,vol,row:idx+2,sheet:row.__sheet||''});
+  });
+  return out;
+}
+function salesWindow(events,days,offsetDays=0){
+  if(!Array.isArray(events)||!events.length)return 0;
+  const today=new Date();
+  today.setHours(0,0,0,0);
+  const end=new Date(today);
+  end.setDate(end.getDate()-offsetDays);
+  const start=new Date(end);
+  start.setDate(start.getDate()-(days-1));
+  const startMs=start.getTime(), endMs=end.getTime();
+  return events.reduce((sum,ev)=>{
+    if(!ev||!ev.d)return sum;
+    const t=new Date(ev.d+'T00:00:00').getTime();
+    if(Number.isNaN(t) || t<startMs || t>endMs)return sum;
+    return sum + (parseInt(ev.q)||0);
+  },0);
+}
+function volumeSalesSnapshot(v){
+  const events=Array.isArray(v?.wv?.events)?v.wv.events:[];
+  const s1=salesWindow(events,1);
+  const s7=salesWindow(events,7);
+  const prev7=salesWindow(events,7,7);
+  const s30=salesWindow(events,30);
+  return {s1,s7,prev7,s30,last:v?.wv?.last||''};
+}
+
 function buildLocalHot(data,favs,cart){
   const items=[];
   const favSet=new Set(favs||[]);
   const series=(data||[]).filter(d=>d&&d.s);
+  const salesSeries=series.map(d=>{
+    const vols=(d.vd||[]).map(v=>({v,...volumeSalesSnapshot(v)}));
+    const s1=vols.reduce((s,x)=>s+x.s1,0);
+    const s7=vols.reduce((s,x)=>s+x.s7,0);
+    const prev7=vols.reduce((s,x)=>s+x.prev7,0);
+    const s30=vols.reduce((s,x)=>s+x.s30,0);
+    const low=vols.filter(x=>(parseInt(x.v.g)||0)<=1 && x.s30>0).map(x=>x.v.n);
+    return {d,vols,s1,s7,prev7,s30,delta:s7-prev7,low};
+  }).filter(x=>x.s30>0||x.s7>0||x.s1>0);
+
+  salesSeries.sort((a,b)=>b.s7-a.s7 || b.s1-a.s1 || b.s30-a.s30);
+  if(salesSeries.length){
+    salesSeries.slice(0,3).forEach(x=>items.push({
+      tag:x.s1>0?'fire':'trend',
+      title:`${x.d.n}`,
+      text:`Vendite registrate: ${x.s1} oggi · ${x.s7} negli ultimi 7 giorni · ${x.s30} negli ultimi 30 giorni.`
+    }));
+    const accelerations=[...salesSeries].filter(x=>x.delta>0).sort((a,b)=>b.delta-a.delta).slice(0,2);
+    accelerations.forEach(x=>items.push({
+      tag:'trend',
+      title:`Accelerazione · ${x.d.n}`,
+      text:`Settimana corrente ${x.s7} vs precedente ${x.prev7}. Crescita netta di ${x.delta} copie.`
+    }));
+    const lowStock=[...salesSeries].filter(x=>x.low.length>0).sort((a,b)=>b.low.length-a.low.length).slice(0,2);
+    lowStock.forEach(x=>items.push({
+      tag:'new',
+      title:`Stock sotto soglia · ${x.d.n}`,
+      text:`Volumi a 0/1 copie con domanda recente: ${x.low.slice(0,8).join(', ')}${x.low.length>8?'…':''}.`
+    }));
+  }
+
   const incomplete=series.map(d=>({d,miss:gm(d.h,d.ut||d.mx),own:d.h.length,total:d.ut||d.mx||0})).filter(x=>x.miss.length>0&&x.total>0);
-  const nearComplete=[...incomplete].sort((a,b)=>(a.miss.length-b.miss.length)||(b.own-a.own)).slice(0,3);
-  const mostMissing=[...incomplete].sort((a,b)=>(b.miss.length-a.miss.length)||(b.total-a.total)).slice(0,2);
-  const favSeries=(data||[]).filter(d=>favSet.has(d.id)).slice(0,3);
+  const nearComplete=[...incomplete].sort((a,b)=>(a.miss.length-b.miss.length)||(b.own-a.own)).slice(0,2);
+  const favSeries=(data||[]).filter(d=>favSet.has(d.id)).slice(0,2);
   const groupedCart=Object.values((cart||[]).reduce((acc,c)=>{
     const k=c.name||`${c.sid}`;
     if(!acc[k])acc[k]={name:c.name,qty:0,vols:[]};
@@ -292,29 +493,27 @@ function buildLocalHot(data,favs,cart){
 
   if(cart&&cart.length){
     items.push({tag:'fire',title:'Ordine condiviso in corso',text:`${cart.reduce((s,c)=>s+(parseInt(c.qty)||0),0)} pezzi su ${groupedCart.length} titoli. Tutti gli utenti vedono lo stesso carrello.`});
-    groupedCart.slice(0,2).forEach(g=>items.push({tag:'new',title:g.name,text:`Nel carrello: ${g.qty} pezzi${g.vols.length?` · volumi ${g.vols.slice(0,6).join(', ')}${g.vols.length>6?'…':''}`:''}.`}));
   }
   nearComplete.forEach(x=>items.push({tag:'trend',title:x.d.n,text:`Serie quasi completa: ${x.own}/${x.total}. Mancano ${x.miss.length} volumi${x.miss.length?` (${x.miss.slice(0,6).join(', ')}${x.miss.length>6?'…':''})`:''}.`}));
-  mostMissing.forEach(x=>items.push({tag:'new',title:`Riordino da pianificare · ${x.d.n}`,text:`Scopertura di ${x.miss.length} volumi su ${x.total}. Da monitorare per futuri import vendite/WinVaria.`}));
   favSeries.forEach(d=>items.push({tag:'trend',title:`Preferito operativo · ${d.n}`,text:`Titolo marcato come preferito. ${d.s?`${d.h.length}/${d.ut||d.mx} volumi presenti.`:'Titolo singolo in evidenza.'}`}));
   if(!items.length){
     const publishers=Object.entries((data||[]).reduce((acc,d)=>{acc[d.e]=(acc[d.e]||0)+1;return acc;},{})).sort((a,b)=>b[1]-a[1]).slice(0,3);
     if(publishers.length)items.push({tag:'new',title:'Distribuzione catalogo',text:`Editori più rappresentati: ${publishers.map(([e,c])=>`${e} (${c})`).join(' · ')}.`});
   }
-  if(!items.length)items.push({tag:'new',title:'Hot locale pronto',text:'Aggiungi dati, preferiti o carrello e la sezione Hot inizierà a generare segnali operativi condivisi.'});
-  return items.slice(0,8);
+  if(!items.length)items.push({tag:'new',title:'Hot locale pronto',text:'Importa un export WinVaria e la sezione Hot inizierà a leggere vendite reali, stock e accelerazioni.'});
+  return items.slice(0,10);
 }
 
-function CoverImg({ean,size}){
-  const[ok,setOk]=useState(true);const url=coverUrl(ean);
+function CoverImg({ean,img,size}){
+  const[ok,setOk]=useState(true);const url=coverUrl(ean,img);
   const w=size||42;const h=Math.round(w*1.4);
   const onL=useCallback(e=>{if(e.target.naturalWidth<10)setOk(false)},[]);
   if(url&&ok)return <img style={{width:w,height:h,borderRadius:4,objectFit:'cover',background:'var(--brd)'}} src={url} alt="" loading="lazy" onError={()=>setOk(false)} onLoad={onL}/>;
   return <div className="cv-ph" style={{width:w,height:h}}>📖</div>;
 }
 
-function VolCover({ean,num}){
-  const[ok,setOk]=useState(true);const url=coverUrl(ean);
+function VolCover({ean,img,num}){
+  const[ok,setOk]=useState(true);const url=coverUrl(ean,img);
   const onL=useCallback(e=>{if(e.target.naturalWidth<10)setOk(false)},[]);
   if(url&&ok)return <img className="vl-img" src={url} alt={num} loading="lazy" onError={()=>setOk(false)} onLoad={onL}/>;
   return <div className="vl-ph">{num}</div>;
@@ -345,7 +544,19 @@ function App(){
   const[authMode,setAuthMode]=useState('signin');
   const[authForm,setAuthForm]=useState({email:'',password:''});
   const[authMsg,setAuthMsg]=useState('');
+  const[winMsg,setWinMsg]=useState('');
+  const[winBusy,setWinBusy]=useState(false);
+  const[showScan,setShowScan]=useState(false);
+  const[scanCode,setScanCode]=useState('');
+  const[scanMsg,setScanMsg]=useState('');
+  const[scanBusy,setScanBusy]=useState(false);
+  const[scanResult,setScanResult]=useState(null);
   const fRef=useRef(null);
+  const fWinRef=useRef(null);
+  const scanVideoRef=useRef(null);
+  const scanStreamRef=useRef(null);
+  const scanLoopRef=useRef(null);
+  const scanBusyRef=useRef(false);
   const hydrateRef=useRef(false);
   const lastRemoteRef=useRef('');
   const pushTimerRef=useRef(null);
@@ -555,9 +766,28 @@ function App(){
 
   const editori=useMemo(()=>{const m={};data.forEach(d=>{m[d.e]=(m[d.e]||0)+1});return Object.entries(m).sort((a,b)=>b[1]-a[1])}, [data]);
   const stats=useMemo(()=>{let ow=0,mi=0,pz=0;data.forEach(d=>{if(d.s){ow+=d.h.length;const mx=d.ut||d.mx;for(let i=1;i<=mx;i++)if(!d.h.includes(i))mi++}pz+=d.tp});return{t:data.length,ow,mi,pz}}, [data]);
+  const salesStats=useMemo(()=>{let s1=0,s7=0,s30=0,low=0,last='';data.forEach(d=>{(d.vd||[]).forEach(v=>{const snap=volumeSalesSnapshot(v);s1+=snap.s1;s7+=snap.s7;s30+=snap.s30;if((parseInt(v.g)||0)<=1 && snap.s30>0)low++;if(snap.last&&(!last||snap.last>last))last=snap.last})});return{s1,s7,s30,low,last}},[data]);
 
   function getEanMap(d){const m={};(d.vd||[]).forEach(v=>{if(v.ean)m[v.n]=v.ean});return m}
   function getSeriesEan(d){if(d.vd&&d.vd.length>0){const f=d.vd.find(v=>v.ean);if(f)return f.ean}if(d.st&&d.st.length>0){const f=d.st.find(s=>s.ean);if(f)return f.ean}return null}
+  function getSeriesImg(d){if(d.vd&&d.vd.length>0){const f=d.vd.find(v=>v.img);if(f)return f.img}if(d.st&&d.st.length>0){const f=d.st.find(s=>s.img);if(f)return f.img}return ''}
+  function findBarcodeMatch(list,code){
+    const isbn=digitsOnly(code);
+    if(!isbn)return null;
+    for(const d of list){
+      if(d.s){
+        for(const v of (d.vd||[])){
+          if(digitsOnly(v.ean)===isbn)return{kind:'series',sid:d.id,vol:v.n,title:v.t||`${d.n} ${v.n}`,seriesName:d.n,ean:isbn,img:v.img||'',publisher:d.e,price:v.p||d.p||0};
+        }
+      }else{
+        for(let i=0;i<(d.st||[]).length;i++){
+          const s=d.st[i];
+          if(digitsOnly(s.ean)===isbn)return{kind:'standalone',sid:d.id,index:i,title:s.t||d.n,seriesName:d.n,ean:isbn,img:s.img||'',publisher:d.e,price:s.p||d.p||0};
+        }
+      }
+    }
+    return null;
+  }
 
   function togFav(id){setFavs(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id])}
   function isFav(id){return favs.includes(id)}
@@ -603,6 +833,225 @@ function App(){
 
   function dlBackup(){const b=new Blob([JSON.stringify({data,favs,cart},null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`manga_backup_${new Date().toISOString().slice(0,10)}.json`;a.click()}
   function loadBackup(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.data&&Array.isArray(d.data)){if(confirm(`${d.data.length} serie trovate. Sostituire?`)){setData(d.data);if(d.favs)setFavs(d.favs);if(d.cart)setCart(d.cart);setExp(null)}}else if(Array.isArray(d)){if(confirm(`${d.length} serie. Sostituire?`)){setData(d);setExp(null)}}}catch(err){alert('Errore: '+err.message)}};r.readAsText(f);e.target.value=''}
+
+  const stopScanner=useCallback(()=>{
+    if(scanLoopRef.current){window.clearInterval(scanLoopRef.current);scanLoopRef.current=null}
+    const stream=scanStreamRef.current;
+    if(stream){stream.getTracks().forEach(t=>t.stop());scanStreamRef.current=null}
+    if(scanVideoRef.current)scanVideoRef.current.srcObject=null;
+    scanBusyRef.current=false;
+  },[]);
+
+  useEffect(()=>()=>stopScanner(),[stopScanner]);
+
+  const runBarcodeLookup=useCallback(async(rawCode)=>{
+    const isbn=digitsOnly(rawCode);
+    if(!isbn){setScanMsg('Codice non valido.');return}
+    setScanCode(isbn);
+    setScanBusy(true);
+    setScanMsg('Analizzo il codice e cerco il titolo…');
+    try{
+      const exact=findBarcodeMatch(data,isbn);
+      const book=exact?null:await lookupBookByIsbn(isbn);
+      if(exact){
+        setScanResult({code:isbn,match:exact,book:{ean:isbn,title:exact.title,seriesName:exact.seriesName,img:exact.img,publisher:exact.publisher,price:exact.price,volume:exact.vol||null}});
+        setScanMsg('Codice trovato nel database: puoi caricare o scaricare subito.');
+      }else if(book&&book.title){
+        setScanResult({code:isbn,match:null,book});
+        setScanMsg('Titolo trovato online. Conferma se vuoi caricarlo nel database.');
+      }else{
+        setScanResult({code:isbn,match:null,book:{ean:isbn,title:'Titolo non trovato',seriesName:'',img:openLibraryCover(isbn,'L')||'',publisher:'',price:0,volume:null}});
+        setScanMsg('Non ho trovato metadata affidabili: puoi comunque inserirlo manualmente come nuovo titolo.');
+      }
+    }catch(err){
+      setScanMsg('Errore durante la ricerca del titolo: '+(err?.message||String(err)));
+    }finally{setScanBusy(false)}
+  },[data]);
+
+  const startScanner=useCallback(async()=>{
+    if(scanBusyRef.current)return;
+    if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia){setScanMsg('Fotocamera disponibile solo su HTTPS o localhost. Su GitHub Pages funzionerà.');return}
+    if(typeof window.BarcodeDetector==='undefined'){setScanMsg('Il browser non supporta BarcodeDetector: usa il campo ISBN qui sotto oppure Chrome/Edge Android.');return}
+    try{
+      scanBusyRef.current=true;
+      setScanMsg('Avvicina il codice a barre al riquadro.');
+      const formats=window.BarcodeDetector.getSupportedFormats?await window.BarcodeDetector.getSupportedFormats():[];
+      const wanted=['ean_13','ean_8','upc_a','upc_e','code_128'];
+      const detector=new window.BarcodeDetector({formats:formats.length?wanted.filter(f=>formats.includes(f)):wanted});
+      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+      scanStreamRef.current=stream;
+      if(scanVideoRef.current){scanVideoRef.current.srcObject=stream;await scanVideoRef.current.play().catch(()=>{})}
+      if(scanLoopRef.current)window.clearInterval(scanLoopRef.current);
+      scanLoopRef.current=window.setInterval(async()=>{
+        if(!scanVideoRef.current||scanVideoRef.current.readyState<2)return;
+        try{
+          const found=await detector.detect(scanVideoRef.current);
+          const value=found?.[0]?.rawValue||'';
+          const code=digitsOnly(value);
+          if(code.length>=8){
+            stopScanner();
+            await runBarcodeLookup(code);
+          }
+        }catch(err){}
+      },500);
+    }catch(err){
+      scanBusyRef.current=false;
+      setScanMsg('Impossibile avviare la fotocamera: '+(err?.message||String(err)));
+    }
+  },[runBarcodeLookup,stopScanner]);
+
+  useEffect(()=>{
+    if(showScan){
+      setScanCode('');setScanResult(null);setScanBusy(false);setScanMsg('');
+      startScanner();
+    }else stopScanner();
+  },[showScan,startScanner,stopScanner]);
+
+  function applyScanDelta(mode){
+    if(!scanResult)return;
+    const delta=mode==='load'?1:-1;
+    const code=digitsOnly(scanResult.code||scanCode);
+    if(!code)return;
+    if(delta<0 && !scanResult.match){setScanMsg('Per scaricare devo trovare prima il volume nel database.');return}
+    setData(prev=>{
+      const next=typeof structuredClone==='function'?structuredClone(prev):JSON.parse(JSON.stringify(prev));
+      const match=findBarcodeMatch(next,code)||scanResult.match;
+      const book=scanResult.book||{};
+      if(match){
+        const item=next.find(d=>d.id===match.sid);
+        if(!item)return prev;
+        if(match.kind==='series'){
+          item.vd=item.vd||[];
+          let meta=item.vd.find(v=>v.n===match.vol);
+          if(!meta){meta={n:match.vol,g:0,p:book.price||item.p||0,ean:code,t:book.title||match.title,img:book.img||match.img||''};item.vd.push(meta)}
+          meta.ean=code;
+          if(book.title)meta.t=book.title;
+          if(book.img)meta.img=book.img;
+          const current=Number(meta.g||0)|| (item.h.includes(match.vol)?1:0);
+          const qty=Math.max(0,current+delta);
+          meta.g=qty;
+          if(qty>0){if(!item.h.includes(match.vol))item.h.push(match.vol);item.h=item.h.sort((a,b)=>a-b)}
+          else item.h=item.h.filter(v=>v!==match.vol);
+          item.tp=item.h.length;
+          item.mx=Math.max(item.mx||0,item.ut||0,match.vol||0);
+          item.ut=Math.max(item.ut||0,match.vol||0);
+          item.m=gm(item.h,item.ut||item.mx);
+        }else{
+          item.st=item.st||[];
+          let row=item.st[match.index]||item.st[0];
+          if(!row){row={t:book.title||item.n,g:0,p:book.price||item.p||0};item.st=[row]}
+          row.ean=code;
+          if(book.title)row.t=book.title;
+          if(book.img)row.img=book.img;
+          row.g=Math.max(0,(Number(row.g)||0)+delta);
+          item.tp=(item.st||[]).reduce((s,r)=>s+(Number(r.g)||0),0);
+        }
+        return next;
+      }
+      const parsed=parseScanTitleMeta(book.title||code);
+      const seriesName=(book.seriesName||parsed.seriesName||book.title||code).trim();
+      const vol=book.volume||parsed.volume;
+      const existing=next.find(d=>d.s&&normTxt(d.n)===normTxt(seriesName));
+      if(existing&&vol){
+        existing.vd=existing.vd||[];
+        let meta=existing.vd.find(v=>v.n===vol);
+        if(!meta){meta={n:vol,g:0,p:book.price||existing.p||0,ean:code,t:book.title||`${existing.n} ${vol}`,img:book.img||''};existing.vd.push(meta)}
+        meta.g=Math.max(0,(Number(meta.g)||0)+1);
+        meta.ean=code;
+        if(book.title)meta.t=book.title;
+        if(book.img)meta.img=book.img;
+        if(!existing.h.includes(vol))existing.h.push(vol);
+        existing.h=existing.h.sort((a,b)=>a-b);
+        existing.mx=Math.max(existing.mx||0,vol);
+        existing.ut=Math.max(existing.ut||0,vol);
+        existing.tp=existing.h.length;
+        existing.m=gm(existing.h,existing.ut||existing.mx);
+        return next;
+      }
+      const id=next.length?Math.max(...next.map(d=>d.id))+1:0;
+      if(vol){
+        next.push({id,n:seriesName.toUpperCase(),e:(book.publisher||'N/A').toUpperCase(),h:[vol],m:gm([vol],Math.max(vol,1)),mx:Math.max(vol,1),tu:Math.max(vol,1),ut:Math.max(vol,1),p:book.price||0,tp:1,s:true,vd:[{n:vol,g:1,p:book.price||0,ean:code,t:(book.title||`${seriesName} ${vol}`).toUpperCase(),img:book.img||''}],st:[]});
+      }else{
+        next.push({id,n:(book.title||seriesName||code).toUpperCase(),e:(book.publisher||'N/A').toUpperCase(),h:[],m:[],mx:0,tu:0,ut:0,p:book.price||0,tp:1,s:false,vd:[],st:[{t:(book.title||seriesName||code).toUpperCase(),g:1,p:book.price||0,ean:code,img:book.img||''}]});
+      }
+      return next;
+    });
+    setScanMsg(mode==='load'?'Carico registrato nel database condiviso.':'Scarico registrato nel database condiviso.');
+  }
+
+  async function importWinvariaFile(e){
+    const file=e.target.files?.[0];
+    if(!file)return;
+    setWinBusy(true);
+    setWinMsg('Lettura file WinVaria in corso…');
+    try{
+      const rows=await readWorkbookRows(file);
+      const entries=extractWinvRows(rows);
+      if(!entries.length){setWinMsg('Nessuna riga utile trovata. Servono almeno EAN/ISBN o titolo, più quantità venduta o giacenza.');setWinBusy(false);e.target.value='';return}
+      let summary={matched:0,unmatched:0,qty:0,stock:0};
+      setData(prev=>{
+        const next=typeof structuredClone==='function'?structuredClone(prev):JSON.parse(JSON.stringify(prev));
+        const eanIndex=new Map();
+        next.forEach(d=>(d.vd||[]).forEach(v=>{const e=digitsOnly(v.ean);if(e)eanIndex.set(e,{sid:d.id,vol:v.n})}));
+        const findByTitle=(entry)=>{
+          const title=normTxt(entry.title);
+          if(!title)return null;
+          for(const d of next){
+            const dn=normTxt(d.n);
+            if(!dn)continue;
+            if(title.includes(dn) || dn.includes(title)){
+              let vol=entry.vol;
+              if(!vol){
+                const m=String(entry.title).match(/(?:vol(?:ume)?|n(?:r|um)?\.?|#)\s*(\d{1,3})/i) || String(entry.title).match(/(\d{1,3})/);
+                vol=m?parseInt(m[1],10):null;
+              }
+              if(d.s && vol && (d.vd||[]).some(v=>v.n===vol))return {sid:d.id,vol};
+              if(!d.s)return {sid:d.id,vol:null};
+            }
+          }
+          return null;
+        };
+        entries.forEach(entry=>{
+          let match=entry.ean?eanIndex.get(entry.ean):null;
+          if(!match)match=findByTitle(entry);
+          if(!match){summary.unmatched++;return}
+          const d=next.find(x=>x.id===match.sid);
+          if(!d)return;
+          const volRec=(d.vd||[]).find(v=>v.n===match.vol);
+          if(!volRec){summary.unmatched++;return}
+          if(entry.stock!=null){volRec.g=Math.max(0,entry.stock);summary.stock++;}
+          else if(entry.qty>0){volRec.g=Math.max(0,(parseInt(volRec.g)||0)-entry.qty);summary.stock++;}
+          if(entry.qty>0){
+            if(!volRec.wv||typeof volRec.wv!=='object')volRec.wv={events:[],total:0,last:''};
+            if(!Array.isArray(volRec.wv.events))volRec.wv.events=[];
+            const ev=volRec.wv.events.find(x=>x.d===entry.date);
+            if(ev)ev.q+=(parseInt(entry.qty)||0); else volRec.wv.events.push({d:entry.date,q:parseInt(entry.qty)||0});
+            volRec.wv.total=(parseInt(volRec.wv.total)||0)+(parseInt(entry.qty)||0);
+            volRec.wv.last=entry.date;
+            summary.qty+=(parseInt(entry.qty)||0);
+          }
+          summary.matched++;
+        });
+        next.forEach(d=>{
+          if(d.s && Array.isArray(d.vd) && d.vd.length){
+            const owned=d.vd.filter(v=>(parseInt(v.g)||0)>0).map(v=>v.n).sort((a,b)=>a-b);
+            d.h=owned;
+            d.m=gm(owned,d.ut||d.mx);
+            d.tp=d.vd.reduce((s,v)=>s+(parseInt(v.g)||0),0);
+          }
+        });
+        return next;
+      });
+      const now=new Date().toLocaleString('it-IT');
+      setTs(now);
+      setWinMsg(`WinVaria importato: ${summary.matched} righe agganciate, ${summary.unmatched} non agganciate, ${summary.qty} copie vendute registrate, ${summary.stock} giacenze aggiornate · ${file.name}`);
+    }catch(err){
+      setWinMsg(`Import WinVaria fallito: ${err.message||err}`);
+    }finally{
+      setWinBusy(false);
+      if(e.target)e.target.value='';
+    }
+  }
 
   async function handleAuthSubmit(modeOverride){
     if(!supabase){setAuthMsg('Il client cloud si sta ancora inizializzando. Riprova tra un istante.');return}
@@ -685,6 +1134,7 @@ function App(){
       </div>
       <div style={{display:'flex',gap:5,marginBottom:8,flexWrap:'wrap'}}>
         <button className="btn bs ba" onClick={()=>setShowAdd(true)}>+ Aggiungi</button>
+        <button className="btn bs bb" onClick={()=>setShowScan(true)}>📷 Scansiona</button>
         <button className="btn bs bg" onClick={()=>{const c='﻿'+data.map(d=>d.n).join('\n');navigator.clipboard?.writeText(c)}}>CSV</button>
       </div>
       <div className="leg"><span><span className="dt dg"></span>Hai</span><span><span className="dt dr"></span>Manca (tap=opzioni)</span></div>
@@ -694,10 +1144,10 @@ function App(){
           const miss=d.s?gm(d.h,d.ut||d.mx):[];const mx=d.ut||d.mx;
           const pct=d.s&&mx>0?Math.round(d.h.length/mx*100):100;
           const isE=exp===d.id;const isCo=d.s&&miss.length===0&&d.h.length>=mx;
-          const eanMap=getEanMap(d);const seriesEan=getSeriesEan(d);
+          const eanMap=getEanMap(d);const seriesEan=getSeriesEan(d);const seriesImg=getSeriesImg(d);
           return(<div key={d.id} className={`sc${isE?' ex':''}`}>
             <div className="sh" onClick={()=>setExp(isE?null:d.id)}>
-              <CoverImg ean={seriesEan}/>
+              <CoverImg ean={seriesEan} img={seriesImg}/>
               <div className="sh-info">
                 <div className="sn"><span className="sn-text">{d.n}</span>
                   {d.s?(isCo?<span className="bdg c">OK</span>:<span className="bdg i">{miss.length}</span>):<span className="bdg sa">1</span>}</div>
@@ -716,7 +1166,7 @@ function App(){
                 const vd=(d.vd||[]).find(x=>x.n===v);
                 return(<div key={v} className={`vl ${owned?'o':'m'}`}
                   onClick={e=>{e.stopPropagation();if(owned)togVol(d.id,v);else onMissingTap(d.id,v)}}>
-                  <VolCover ean={ean} num={v}/>
+                  <VolCover ean={ean} img={vd?.img} num={v}/>
                   <div className="vl-num">{v}</div>
                   {vd&&vd.g>1&&<div className="vl-giac">×{vd.g}</div>}
                 </div>)})}</div>
@@ -745,7 +1195,7 @@ function App(){
         missingData.map(d=>(
           <div key={d.id} className="miss-card">
             <div className="miss-card-hdr">
-              <CoverImg ean={getSeriesEan(d)} size={32}/>
+              <CoverImg ean={getSeriesEan(d)} img={getSeriesImg(d)} size={32}/>
               <span className="sn-text">{d.n}</span>
               <span style={{fontSize:10,color:'var(--dim)'}}>{d.miss.length} manc.</span>
               <button className="btn bs bpur" onClick={()=>addAllMissing(d.id)}>+ Tutti al carrello</button>
@@ -792,9 +1242,26 @@ function App(){
 
   const renderHot=()=>(
     <>
+      <div className="bbar" style={{alignItems:'flex-start'}}>
+        <div className="inf"><strong>🔌 Integrazione WinVaria + scanner</strong>Importa l’export giornaliero WinVaria oppure usa la fotocamera del telefono per caricare/scaricare un volume direttamente dal database condiviso.</div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          <button className="btn bgrn bs" onClick={()=>fWinRef.current?.click()} disabled={winBusy}>{winBusy?'Import…':'⬆ Importa WinVaria'}</button>
+          <button className="btn bs bb" onClick={()=>setShowScan(true)}>📷 Scanner</button>
+          <input ref={fWinRef} type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={importWinvariaFile}/>
+          <button className="btn bs ba" onClick={loadHot} disabled={hotLoading}>{hotLoading?'Calcolo…':'🔄 Ricalcola'}</button>
+        </div>
+      </div>
+      <div className="cloud-help" style={{marginBottom:10}}>Formati consigliati: export vendite o giacenze con colonne tipo EAN/ISBN, quantità venduta e/o giacenza. In più puoi scansionare un ISBN/EAN dal telefono: se il volume esiste lo carichi/scarichi, altrimenti l’app prova a recuperare titolo e copertina e a proporne la creazione.</div>
+      {winMsg&&<div className="cloud-help" style={{marginBottom:10}}>{winMsg}</div>}
+      <div className="cloud-help" style={{marginBottom:10,display:'flex',gap:12,flexWrap:'wrap'}}>
+        <span><strong>Oggi:</strong> {salesStats.s1}</span>
+        <span><strong>7 giorni:</strong> {salesStats.s7}</span>
+        <span><strong>30 giorni:</strong> {salesStats.s30}</span>
+        <span><strong>Sotto soglia:</strong> {salesStats.low}</span>
+        <span><strong>Ultimo evento:</strong> {salesStats.last||'—'}</span>
+      </div>
       <div className="hot-refresh">
         <h2 style={{fontSize:16,color:'var(--hot)'}}>🔥 HOT - segnali operativi condivisi</h2>
-        <button className="btn bs ba" onClick={loadHot} disabled={hotLoading}>{hotLoading?'Calcolo…':'🔄 Ricalcola'}</button>
       </div>
       {hotLoading&&!hotData?.length?<div className="hot-loading"><div className="hot-spinner"></div><p style={{marginTop:8}}>Ricalcolo i segnali del negozio...</p></div>:
         hotData&&hotData.length?hotData.map((item,i)=>(
@@ -845,6 +1312,46 @@ function App(){
           </div>
         </div>
       </div>}
+
+      {showScan&&<div className="mo" onClick={()=>setShowScan(false)}><div className="md" onClick={e=>e.stopPropagation()}>
+        <h3>Scanner ISBN / EAN</h3>
+        <div className="scan-box">
+          <div className="scan-tip">Su telefono puoi inquadrare il codice a barre del manga/fumetto. Se il volume esiste già, l’app ti farà scegliere se caricarlo o scaricarlo. Se non esiste, proverà a cercare titolo e copertina e a proporre la creazione del record.</div>
+          <div className="scan-video-wrap">
+            <video ref={scanVideoRef} className="scan-video" playsInline muted autoPlay />
+            <div className="scan-target"></div>
+          </div>
+          <div className="scan-actions">
+            <button className="btn bb" onClick={startScanner}>🎥 Avvia fotocamera</button>
+            <button className="btn bg" onClick={stopScanner}>⏸ Ferma</button>
+          </div>
+          <div className="scan-inline">
+            <input value={scanCode} onChange={e=>setScanCode(e.target.value)} placeholder="Inserisci ISBN / EAN manualmente" inputMode="numeric" style={{flex:'1 1 220px',background:'var(--bg)',border:'1px solid var(--brd)',color:'var(--txt)',padding:'10px 12px',borderRadius:10,fontSize:14,fontFamily:'inherit'}}/>
+            <button className="btn ba" onClick={()=>runBarcodeLookup(scanCode)} disabled={scanBusy}>{scanBusy?'Cerco…':'Cerca codice'}</button>
+          </div>
+          {scanMsg&&<div className="cloud-help">{scanMsg}</div>}
+          {scanResult&&<div className="scan-result">
+            {coverUrl(scanResult.code,scanResult.book?.img)?<img className="scan-cover" src={coverUrl(scanResult.code,scanResult.book?.img)} alt="cover" onError={e=>{e.currentTarget.style.display='none'}}/>:<div className="scan-cover-ph">📚</div>}
+            <div className="scan-meta">
+              <div>
+                {scanResult.match?<span className="scan-pill ok">GIÀ IN DATABASE</span>:<span className="scan-pill info">NUOVO CODICE</span>}
+                {!scanResult.match&&scanResult.book?.title?<span className="scan-pill warn">LOOKUP ONLINE</span>:null}
+              </div>
+              <h4>{scanResult.book?.title||scanResult.match?.title||'Codice rilevato'}</h4>
+              <div className="mini">{scanResult.book?.seriesName?`Serie: ${scanResult.book.seriesName}`:''}{scanResult.book?.volume?` · Vol. ${scanResult.book.volume}`:''}{scanResult.book?.publisher?` · ${scanResult.book.publisher}`:''}</div>
+              <div className="scan-code">{scanResult.code}</div>
+              <div className="mb" style={{flexWrap:'wrap'}}>
+                <button className="btn bgrn" onClick={()=>applyScanDelta('load')}>📥 Carica +1</button>
+                <button className="btn bg" onClick={()=>applyScanDelta('unload')} disabled={!scanResult.match}>📤 Scarica -1</button>
+                <button className="btn bb" onClick={()=>{setScanCode('');setScanResult(null);setScanMsg('');startScanner()}}>🔄 Nuova scansione</button>
+              </div>
+            </div>
+          </div>}
+          <div className="mb" style={{flexWrap:'wrap'}}>
+            <button className="btn bg" onClick={()=>setShowScan(false)}>Chiudi</button>
+          </div>
+        </div>
+      </div></div>}
 
       {showAdd&&<div className="mo" onClick={()=>setShowAdd(false)}><div className="md" onClick={e=>e.stopPropagation()}>
         <h3>Aggiungi serie</h3>
