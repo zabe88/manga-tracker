@@ -115,52 +115,6 @@ body{background:var(--bg);color:var(--txt);font-family:'DM Sans',sans-serif;-web
 .hot-spinner{display:inline-block;width:20px;height:20px;border:2px solid var(--brd);border-top-color:var(--hot);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* Scanner */
-.scan-box{display:grid;gap:12px}
-.scan-video-wrap{position:relative;border:1px solid var(--brd);border-radius:14px;overflow:hidden;background:#05070a;min-height:220px}
-.scan-video{width:100%;height:260px;object-fit:cover;background:#05070a;display:block}
-.scan-target{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
-.scan-target::before{content:'';width:min(74vw,260px);height:120px;border:2px solid rgba(255,255,255,.92);border-radius:14px;box-shadow:0 0 0 9999px rgba(0,0,0,.18)}
-.scan-tip{font-size:11px;color:var(--dim);line-height:1.5}
-.scan-actions{display:flex;gap:8px;flex-wrap:wrap}
-.scan-result{display:flex;gap:12px;align-items:flex-start;padding:12px;border-radius:12px;border:1px solid var(--brd);background:linear-gradient(135deg,#151922,#111318)}
-.scan-cover{width:72px;height:102px;border-radius:10px;object-fit:cover;background:var(--bg);border:1px solid var(--brd)}
-.scan-cover-ph{width:72px;height:102px;border-radius:10px;background:var(--bg);border:1px solid var(--brd);display:flex;align-items:center;justify-content:center;color:var(--dim)}
-.scan-meta{flex:1;min-width:0}
-.scan-meta h4{margin:0 0 6px;font-size:15px;color:var(--txt)}
-.scan-meta .mini{font-size:11px;color:var(--dim);line-height:1.5}
-.scan-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--txt);background:var(--bg);border:1px solid var(--brd);padding:4px 8px;border-radius:999px;display:inline-block;margin-top:6px}
-.scan-pill{display:inline-block;padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700;margin-right:6px;border:1px solid transparent}
-.scan-pill.ok{background:rgba(59,178,115,.12);color:var(--grn);border-color:rgba(59,178,115,.25)}
-.scan-pill.warn{background:rgba(255,184,0,.1);color:var(--yel);border-color:rgba(255,184,0,.2)}
-.scan-pill.info{background:rgba(54,124,255,.1);color:var(--blu);border-color:rgba(54,124,255,.2)}
-.scan-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.scan-reader{position:relative;border:1px solid var(--brd);border-radius:14px;overflow:hidden;background:#05070a;min-height:280px;height:min(46dvh,420px);max-height:420px}
-.scan-reader:empty::before{content:'Scanner pronto';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px}.scan-reader video{transform:none!important}
-.scan-reader video{width:100%!important;height:100%!important;object-fit:cover!important;background:#05070a}
-.scan-topbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.scan-topbar select,.scan-topbar input{background:var(--bg);border:1px solid var(--brd);color:var(--txt);padding:10px 12px;border-radius:10px;font-size:14px;font-family:inherit}
-.scan-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:12px;align-items:start;min-height:0;flex:1}
-.scan-grid>div{min-width:0}
-.scan-grid>div:first-child{display:flex;flex-direction:column;min-height:0}
-.scan-grid>div:last-child{min-height:0;overflow:auto;padding-right:4px}
-.scan-editor{display:grid;gap:10px;align-content:start}
-.scan-modal{width:min(980px,100%);max-width:980px;height:min(94dvh,900px);max-height:94dvh;padding:16px;overflow:hidden;display:flex;flex-direction:column}
-.scan-modal .scan-box{flex:1;min-height:0;overflow:hidden}
-body.scan-open{overflow:hidden;overscroll-behavior:none}
-.scan-editor .fd{margin:0}
-.scan-editor-cta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.scan-history{display:grid;gap:8px;max-height:200px;overflow:auto;padding-right:2px}
-.scan-history-item{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:10px;border:1px solid var(--brd);background:linear-gradient(135deg,#151922,#111318);font-size:12px}
-.scan-history-item strong{display:block;color:var(--txt);font-size:12px}
-.scan-history-item .mini{font-size:11px;color:var(--dim)}
-.scan-mode-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--brd);font-size:11px;color:var(--dim);background:var(--bg)}
-.scan-mini-actions{display:flex;gap:8px;flex-wrap:wrap}
-.scan-stat{font-size:11px;color:var(--dim)}
-#scan-reader__dashboard_section_csr span{color:#fff!important}
-#scan-reader video{border-radius:0!important}
-@media(max-width:760px){.scan-modal{height:100dvh;max-height:100dvh;border-radius:16px 16px 0 0;padding:14px}.scan-grid{grid-template-columns:1fr;grid-template-rows:auto 1fr;overflow:hidden}.scan-grid>div:first-child{position:sticky;top:0;z-index:1;background:var(--card);padding-bottom:8px}.scan-grid>div:last-child{overflow:auto;-webkit-overflow-scrolling:touch;padding-bottom:16px}.scan-reader{min-height:240px;height:36dvh;max-height:42dvh}.scan-topbar{position:sticky;top:0;z-index:2;background:var(--card);padding-bottom:8px}}
-
 /* Modal */
 .mo{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:100;display:flex;align-items:flex-end;justify-content:center}
 .md{background:var(--card);border:1px solid var(--brd);border-radius:16px 16px 0 0;padding:20px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto}
@@ -198,6 +152,31 @@ input[type="file"]{display:none}
 .cloud-status-dot.ok{background:var(--grn)}.cloud-status-dot.info{background:var(--blu)}.cloud-status-dot.warn{background:var(--yel)}.cloud-status-dot.error{background:var(--acc)}.cloud-status-dot.muted{background:var(--dim)}
 .auth-note{font-size:11px;color:var(--dim);line-height:1.5;margin-top:8px}
 
+
+/* Stable scanner */
+.scan-box{display:grid;gap:12px}
+.scan-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.scan-tip{font-size:12px;color:var(--dim);line-height:1.45}
+.scan-file{display:none}
+.scan-result{display:flex;gap:12px;align-items:flex-start;padding:12px;border-radius:12px;border:1px solid var(--brd);background:linear-gradient(135deg,#151922,#111318)}
+.scan-cover{width:74px;height:104px;border-radius:10px;object-fit:cover;background:var(--bg);border:1px solid var(--brd)}
+.scan-cover-ph{width:74px;height:104px;border-radius:10px;background:var(--bg);border:1px solid var(--brd);display:flex;align-items:center;justify-content:center;color:var(--dim)}
+.scan-meta{flex:1;min-width:0}
+.scan-meta h4{margin:0 0 6px;font-size:15px;color:var(--txt)}
+.scan-meta .mini{font-size:11px;color:var(--dim);line-height:1.45}
+.scan-code{display:inline-block;margin-top:6px;padding:4px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--brd);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--txt)}
+.scan-editor{display:grid;gap:10px}
+.scan-editor-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.scan-editor .fd{margin:0}
+.scan-cta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.scan-history{display:grid;gap:8px;max-height:180px;overflow:auto;padding-right:2px}
+.scan-history-item{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:10px;border:1px solid var(--brd);background:linear-gradient(135deg,#151922,#111318);font-size:12px}
+.scan-history-item strong{display:block;color:var(--txt);font-size:12px}
+.scan-history-item .mini{font-size:11px;color:var(--dim)}
+.scan-pill{display:inline-block;padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700;margin-right:6px;border:1px solid transparent}
+.scan-pill.ok{background:rgba(59,178,115,.12);color:var(--grn);border-color:rgba(59,178,115,.25)}
+.scan-pill.warn{background:rgba(255,184,0,.1);color:var(--yel);border-color:rgba(255,184,0,.2)}
+@media(max-width:760px){.scan-editor-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -207,8 +186,7 @@ input[type="file"]{display:none}
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script>var defined_SHEETJS=false;</script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/@zxing/library@0.21.3"></script>
-<script src="https://unpkg.com/@zxing/browser@0.1.5"></script>
+<script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.min.js"></script>
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 window.supabaseLib={createClient};
@@ -224,7 +202,6 @@ const K_TS=SK+'_ts';
 const K_FAV=SK+'_fav';
 const K_CART=SK+'_cart';
 const K_CFG=SK+'_cfg';
-const K_SCAN_HISTORY=SK+'_scan_history';
 const CLOUD_ROW_ID='main';
 const SUPABASE_SQL=`create table if not exists public.app_state (
   id text primary key,
@@ -279,67 +256,7 @@ on conflict (id) do nothing;`;
 
 function prep(){return INIT.map((d,i)=>({...d,id:i,ut:d.tu||d.mx}))}
 function gm(h,mx){const m=[];for(let i=1;i<=mx;i++)if(!h.includes(i))m.push(i);return m}
-function cleanImg(url){return String(url||'').trim().replace(/^http:/,'https:')}
-function openLibraryCover(ean,size='L'){const code=digitsOnly(ean);return code.length>=10?`https://covers.openlibrary.org/b/isbn/${code}-${size}.jpg?default=false`:null}
-function coverUrl(ean,img){
-  const clean=cleanImg(img);
-  if(clean)return clean;
-  if(!ean||ean==='None'||ean==='nan'||String(ean).length<10)return null;
-  return 'https://books.google.com/books/content?vid=isbn:'+ean+'&printsec=frontcover&img=1&zoom=1';
-}
-function parseScanTitleMeta(rawTitle){
-  const raw=String(rawTitle||'').trim();
-  if(!raw)return{seriesName:'',volume:null,title:''};
-  let title=raw.replace(/\s+/g,' ').trim();
-  let volume=null;
-  const patterns=[/\b(?:vol(?:ume)?|n(?:umero)?|no\.?|#)\s*([0-9]{1,4})\b/i,/\b([0-9]{1,4})\s*$/i,/\b(?:tomo|parte)\s*([0-9]{1,4})\b/i];
-  let match=null;
-  for(const rx of patterns){const m=title.match(rx);if(m){match=m;volume=parseInt(m[1],10);if(Number.isFinite(volume))break}}
-  let seriesName=title;
-  if(match){seriesName=title.replace(match[0],' ').replace(/[\-–—:]+$/,'').replace(/\s+/g,' ').trim()}
-  seriesName=seriesName.replace(/\b(?:manga|graphic novel|fumetto)\b$/i,'').replace(/\s+/g,' ').trim();
-  return{seriesName:seriesName||title,volume:Number.isFinite(volume)&&volume>0?volume:null,title};
-}
-async function lookupBookByIsbn(code){
-  const isbn=digitsOnly(code);
-  if(isbn.length<8)return null;
-  const out={ean:isbn,title:'',publisher:'',price:0,img:'',seriesName:'',volume:null,source:'manual'};
-  try{
-    const res=await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
-    if(res.ok){
-      const json=await res.json();
-      const item=json?.items?.[0];
-      if(item){
-        const info=item.volumeInfo||{};
-        out.title=(info.title||'').trim();
-        out.publisher=(info.publisher||'').trim();
-        out.price=parseNum(item.saleInfo?.listPrice?.amount)||0;
-        out.img=cleanImg(info.imageLinks?.thumbnail||info.imageLinks?.smallThumbnail||'');
-        out.source='google_books';
-      }
-    }
-  }catch(e){}
-  if(!out.title){
-    try{
-      const res=await fetch(`https://openlibrary.org/search.json?isbn=${isbn}&limit=1&fields=title,publisher,cover_i`);
-      if(res.ok){
-        const json=await res.json();
-        const doc=json?.docs?.[0];
-        if(doc){
-          out.title=(doc.title||'').trim();
-          out.publisher=Array.isArray(doc.publisher)?String(doc.publisher[0]||'').trim():String(doc.publisher||'').trim();
-          if(doc.cover_i)out.img=`https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`;
-          out.source='open_library_search';
-        }
-      }
-    }catch(e){}
-  }
-  const meta=parseScanTitleMeta(out.title||isbn);
-  out.seriesName=meta.seriesName;
-  out.volume=meta.volume;
-  if(!out.img)out.img=openLibraryCover(isbn,'L')||'';
-  return out;
-}
+function coverUrl(ean,img){if(img)return img;if(!ean||ean==='None'||ean==='nan'||String(ean).length<10)return null;const code=digitsOnly(ean);return 'https://books.google.com/books/content?vid=isbn:'+code+'&printsec=frontcover&img=1&zoom=1'}
 function safeParse(v,fallback){try{const p=JSON.parse(v);return p??fallback}catch{return fallback}}
 function stable(v){try{return JSON.stringify(v)}catch{return ''}}
 const EMBEDDED_CLOUD_CFG=Object.freeze({
@@ -547,7 +464,7 @@ function buildLocalHot(data,favs,cart){
   return items.slice(0,10);
 }
 
-function CoverImg({ean,img,size}){
+function CoverImg({ean,size,img}){
   const[ok,setOk]=useState(true);const url=coverUrl(ean,img);
   const w=size||42;const h=Math.round(w*1.4);
   const onL=useCallback(e=>{if(e.target.naturalWidth<10)setOk(false)},[]);
@@ -555,7 +472,7 @@ function CoverImg({ean,img,size}){
   return <div className="cv-ph" style={{width:w,height:h}}>📖</div>;
 }
 
-function VolCover({ean,img,num}){
+function VolCover({ean,num,img}){
   const[ok,setOk]=useState(true);const url=coverUrl(ean,img);
   const onL=useCallback(e=>{if(e.target.naturalWidth<10)setOk(false)},[]);
   if(url&&ok)return <img className="vl-img" src={url} alt={num} loading="lazy" onError={()=>setOk(false)} onLoad={onL}/>;
@@ -590,24 +507,15 @@ function App(){
   const[winMsg,setWinMsg]=useState('');
   const[winBusy,setWinBusy]=useState(false);
   const[showScan,setShowScan]=useState(false);
-  const[scanCode,setScanCode]=useState('');
-  const[scanMsg,setScanMsg]=useState('');
   const[scanBusy,setScanBusy]=useState(false);
-  const[scanRunning,setScanRunning]=useState(false);
-  const[scanResult,setScanResult]=useState(null);
+  const[scanMsg,setScanMsg]=useState('Scatta il barcode principale sul retro del volume.');
+  const[scanCode,setScanCode]=useState('');
   const[scanQty,setScanQty]=useState(1);
-  const[scanCameras,setScanCameras]=useState([]);
-  const[scanCameraId,setScanCameraId]=useState('');
-  const[scanHistory,setScanHistory]=useState(()=>{const v=safeParse(localStorage.getItem(K_SCAN_HISTORY),[]);return Array.isArray(v)?v:[]});
-  const[scanEditor,setScanEditor]=useState({title:'',seriesName:'',publisher:'',volume:'',price:''});
-  const isIOS=useMemo(()=>/iP(hone|ad|od)/i.test(navigator.userAgent)||(/Mac/i.test(navigator.platform||'')&&navigator.maxTouchPoints>1),[]);
+  const[scanResult,setScanResult]=useState(null);
+  const[scanHistory,setScanHistory]=useState(()=>{const v=safeParse(localStorage.getItem('manga_scan_history'),[]);return Array.isArray(v)?v:[]});
+  const scanFileRef=useRef(null);
   const fRef=useRef(null);
   const fWinRef=useRef(null);
-  const scanFileRef=useRef(null);
-  const scanBusyRef=useRef(false);
-  const scanInstanceRef=useRef(null);
-  const scanLockRef=useRef(false);
-  const lastScanRef=useRef({code:'',ts:0});
   const hydrateRef=useRef(false);
   const lastRemoteRef=useRef('');
   const pushTimerRef=useRef(null);
@@ -631,8 +539,6 @@ function App(){
   },[]);
 
   const cloudPayload=useMemo(()=>normalizePayload({data,favs,cart}),[data,favs,cart]);
-  useEffect(()=>{try{localStorage.setItem(K_SCAN_HISTORY,JSON.stringify((scanHistory||[]).slice(0,30)))}catch(e){}},[scanHistory]);
-
   useEffect(()=>{cloudPayloadRef.current=cloudPayload},[cloudPayload]);
 
   useEffect(()=>{try{
@@ -830,16 +736,39 @@ function App(){
     for(const d of list){
       if(d.s){
         for(const v of (d.vd||[])){
-          if(digitsOnly(v.ean)===isbn)return{kind:'series',sid:d.id,vol:v.n,title:v.t||`${d.n} ${v.n}`,seriesName:d.n,ean:isbn,img:v.img||'',publisher:d.e,price:v.p||d.p||0};
+          if(digitsOnly(v.ean)===isbn)return{kind:'series',sid:d.id,vol:v.n,title:v.t||`${d.n} ${v.n}`,seriesName:d.n,ean:isbn,img:v.img||'',publisher:d.e,price:v.p||d.p||0,stock:parseInt(v.g)||0};
         }
       }else{
         for(let i=0;i<(d.st||[]).length;i++){
           const s=d.st[i];
-          if(digitsOnly(s.ean)===isbn)return{kind:'standalone',sid:d.id,index:i,title:s.t||d.n,seriesName:d.n,ean:isbn,img:s.img||'',publisher:d.e,price:s.p||d.p||0};
+          if(digitsOnly(s.ean)===isbn)return{kind:'standalone',sid:d.id,index:i,title:s.t||d.n,seriesName:d.n,ean:isbn,img:s.img||'',publisher:d.e,price:s.p||d.p||0,stock:parseInt(s.g)||0};
         }
       }
     }
     return null;
+  }
+  async function lookupBookMeta(rawCode){
+    const isbn=digitsOnly(rawCode);
+    if(!isbn) return {ean:'',title:'',publisher:'',image:'',seriesName:'',volume:null};
+    const base={ean:isbn,title:'',publisher:'',image:`https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false`,seriesName:'',volume:null};
+    try{
+      const r=await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+      const j=await r.json();
+      const item=j?.items?.[0]?.volumeInfo;
+      if(item){
+        base.title=item.title||base.title;
+        base.publisher=item.publisher||base.publisher;
+        base.image=item.imageLinks?.thumbnail?.replace('http://','https://')||item.imageLinks?.smallThumbnail?.replace('http://','https://')||base.image;
+      }
+    }catch(e){}
+    const title=base.title||'';
+    const m=title.match(/^(.*?)(?:\s+(?:vol\.?|n\.|#)\s*(\d+)|\s+(\d+))$/i);
+    if(m){
+      base.seriesName=(m[1]||'').trim();
+      base.volume=parseInt(m[2]||m[3]||'',10)||null;
+    }
+    if(!base.seriesName) base.seriesName=title;
+    return base;
   }
 
   function togFav(id){setFavs(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id])}
@@ -884,288 +813,127 @@ function App(){
   function addS(ns){const id=data.length?Math.max(...data.map(d=>d.id))+1:0;setData(p=>[...p,{...ns,id,m:gm(ns.h,ns.ut),vd:[],tp:ns.s?ns.h.length:1}]);setShowAdd(false)}
   function delS(id){if(confirm('Eliminare?')){setData(p=>p.filter(d=>d.id!==id));setExp(null)}}
 
+  function openScanner(){
+    setShowScan(true);
+    setScanBusy(false);
+    setScanCode('');
+    setScanQty(1);
+    setScanResult(null);
+    setScanMsg('Scatta il barcode principale sul retro del volume.');
+    if(scanFileRef.current) scanFileRef.current.value='';
+  }
+
+  async function decodeBarcodeFile(file){
+    if(!file) throw new Error('Nessuna immagine selezionata.');
+    if(window.Quagga?.decodeSingle){
+      const url=URL.createObjectURL(file);
+      try{
+        const code=await new Promise((resolve,reject)=>{
+          window.Quagga.decodeSingle({
+            src:url,
+            numOfWorkers:0,
+            locate:true,
+            inputStream:{size:1200,singleChannel:false},
+            locator:{patchSize:'medium',halfSample:true},
+            decoder:{readers:['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader']}
+          },result=>{
+            const found=result?.codeResult?.code||'';
+            if(found) resolve(found); else reject(new Error('Barcode non rilevato. Prova con più luce, il codice dritto e più vicino.'));
+          });
+        });
+        return code;
+      }finally{URL.revokeObjectURL(url)}
+    }
+    throw new Error('Decoder barcode non disponibile.');
+  }
+
+  async function handleScanFile(file){
+    if(!file) return;
+    setScanBusy(true);
+    setScanMsg('Analizzo il barcode...');
+    try{
+      const raw=await decodeBarcodeFile(file);
+      const code=digitsOnly(raw);
+      if(!code) throw new Error('Codice non valido.');
+      setScanCode(code);
+      const existing=findBarcodeMatch(data,code);
+      if(existing){
+        const meta={...existing,stock:existing.stock||0};
+        setScanResult(meta);
+        setScanMsg('Codice trovato nel database condiviso. Scegli se caricare o scaricare.');
+      }else{
+        const meta=await lookupBookMeta(code);
+        setScanResult({kind:'new',sid:null,index:null,vol:meta.volume,title:meta.title||`Codice ${code}`,seriesName:meta.seriesName||meta.title||`Codice ${code}`,ean:code,img:meta.image||'',publisher:meta.publisher||'N/A',price:0,stock:0});
+        setScanMsg('Codice nuovo. Controlla titolo e poi caricalo nel database.');
+      }
+    }catch(err){
+      setScanResult(null);
+      setScanMsg(err?.message||String(err));
+    }finally{
+      setScanBusy(false);
+      if(scanFileRef.current) scanFileRef.current.value='';
+    }
+  }
+
+  function updateScanField(field,value){setScanResult(r=>r?({...r,[field]:value}):r)}
+
+  function applyScannedAction(mode){
+    if(!scanResult || !scanCode) return;
+    const qty=Math.max(1,parseInt(scanQty)||1);
+    const today=new Date().toISOString().slice(0,10);
+    setData(prev=>{
+      let touched=false;
+      const next=prev.map(d=>{
+        if(d.s){
+          const idx=(d.vd||[]).findIndex(v=>digitsOnly(v.ean)===scanCode);
+          if(idx<0) return d;
+          touched=true;
+          const vd=(d.vd||[]).map(v=>({...v, wv:v?.wv?{...v.wv,events:[...(v.wv.events||[])]}:undefined}));
+          const curr={...vd[idx]};
+          const g0=parseInt(curr.g)||0;
+          const g1=mode==='in' ? g0+qty : Math.max(0,g0-qty);
+          curr.g=g1;
+          curr.t=scanResult.title||curr.t||`${d.n} ${curr.n}`;
+          curr.img=scanResult.img||curr.img||'';
+          curr.p=parseFloat(scanResult.price)||curr.p||d.p||0;
+          if(mode==='out'){
+            const events=Array.isArray(curr.wv?.events)?[...curr.wv.events]:[];
+            events.push({d:today,q:qty});
+            curr.wv={...(curr.wv||{}),events,last:today};
+          }
+          vd[idx]=curr;
+          const owned=g1>0 ? Array.from(new Set([...(d.h||[]),curr.n])).sort((a,b)=>a-b) : (d.h||[]).filter(x=>x!==curr.n);
+          return {...d,vd,h:owned,m:gm(owned,d.ut||d.mx),tp:owned.length};
+        }
+        const idx=(d.st||[]).findIndex(s=>digitsOnly(s.ean)===scanCode);
+        if(idx<0) return d;
+        touched=true;
+        const st=(d.st||[]).map(s=>({...s}));
+        const curr={...st[idx]};
+        const g0=parseInt(curr.g)||0;
+        const g1=mode==='in' ? g0+qty : Math.max(0,g0-qty);
+        curr.g=g1;
+        curr.t=scanResult.title||curr.t||d.n;
+        curr.img=scanResult.img||curr.img||'';
+        curr.p=parseFloat(scanResult.price)||curr.p||d.p||0;
+        st[idx]=curr;
+        return {...d,st,tp:st.reduce((s,x)=>s+(parseInt(x.g)||0),0)};
+      });
+      if(touched) return next;
+      if(mode==='out') return prev;
+      const nextId=(prev.length?Math.max(...prev.map(d=>d.id)):0)+1;
+      const price=parseFloat(scanResult.price)||0;
+      const title=(scanResult.title||`Codice ${scanCode}`).trim();
+      const publisher=(scanResult.publisher||'N/A').trim()||'N/A';
+      return [...prev,{id:nextId,n:(scanResult.seriesName||title).toUpperCase(),e:publisher.toUpperCase(),h:[],mx:0,tu:0,ut:0,p:price,tp:qty,s:false,st:[{t:title,g:qty,p:price,ean:scanCode,img:scanResult.img||''}],vd:[]}];
+    });
+    setScanResult(r=>r?({...r,stock: mode==='in' ? (parseInt(r.stock)||0)+qty : Math.max(0,(parseInt(r.stock)||0)-qty)}):r);
+    setScanHistory(prev=>[{id:Date.now(),code:scanCode,title:scanResult.title||scanResult.seriesName||scanCode,mode,qty,at:new Date().toLocaleString('it-IT')},...prev].slice(0,30));
+    setScanMsg(mode==='in'?'Carico registrato nel database condiviso.':'Scarico registrato nel database condiviso.');
+  }
+
   function dlBackup(){const b=new Blob([JSON.stringify({data,favs,cart},null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`manga_backup_${new Date().toISOString().slice(0,10)}.json`;a.click()}
   function loadBackup(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.data&&Array.isArray(d.data)){if(confirm(`${d.data.length} serie trovate. Sostituire?`)){setData(d.data);if(d.favs)setFavs(d.favs);if(d.cart)setCart(d.cart);setExp(null)}}else if(Array.isArray(d)){if(confirm(`${d.length} serie. Sostituire?`)){setData(d);setExp(null)}}}catch(err){alert('Errore: '+err.message)}};r.readAsText(f);e.target.value=''}
-
-  useEffect(()=>{document.body.classList.toggle('scan-open',showScan);return()=>document.body.classList.remove('scan-open')},[showScan]);
-
-  const stopScanner=useCallback(async({resetLock=false}={})=>{
-    scanBusyRef.current=false;
-    setScanRunning(false);
-    try{zxingControlsRef.current?.stop?.()}catch(e){}
-    zxingControlsRef.current=null;
-    const video=document.getElementById('scan-video');
-    try{ if(video?.srcObject){ video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject=null; } }catch(e){}
-    if(resetLock){
-      scanLockRef.current=false;
-      lastScanRef.current={code:'',ts:0};
-    }
-  },[]);
-
-  useEffect(()=>()=>{stopScanner()},[stopScanner]);
-
-  const recordScanHistory=useCallback((entry)=>{
-    setScanHistory(prev=>[{id:Date.now()+Math.random(),...entry},...(prev||[])].slice(0,30));
-  },[]);
-
-  const refreshScanCameras=useCallback(async()=>{
-    try{
-      if(!navigator.mediaDevices?.enumerateDevices)return[];
-      const devices=await navigator.mediaDevices.enumerateDevices();
-      const cams=(Array.isArray(devices)?devices:[]).filter(d=>d.kind==='videoinput').map((d,i)=>({id:d.deviceId,label:d.label||`Camera ${i+1}`}));
-      setScanCameras(cams);
-      if(cams.length && !scanCameraId){
-        const preferred=cams.find(c=>/back|rear|environment|wide|ultra/i.test(String(c.label||'')))||cams[0];
-        setScanCameraId(preferred.id);
-      }
-      return cams;
-    }catch(err){
-      return [];
-    }
-  },[scanCameraId]);
-
-  const runBarcodeLookup=useCallback(async(rawCode, source='manual')=>{
-    const isbn=digitsOnly(rawCode);
-    if(!isbn){setScanMsg('Codice non valido.');return}
-    setScanCode(isbn);
-    setScanBusy(true);
-    setScanMsg('Analizzo il codice e cerco il titolo…');
-    try{
-      const exact=findBarcodeMatch(data,isbn);
-      const book=exact?null:await lookupBookByIsbn(isbn);
-      if(exact){
-        setScanResult({code:isbn,match:exact,source,book:{ean:isbn,title:exact.title,seriesName:exact.seriesName,img:exact.img,publisher:exact.publisher,price:exact.price,volume:exact.vol||null}});
-        setScanMsg('Codice trovato nel database: puoi caricare o scaricare subito.');
-      }else if(book&&book.title){
-        setScanResult({code:isbn,match:null,source,book});
-        setScanMsg('Titolo trovato online. Puoi correggere i campi prima di salvarlo nel database.');
-      }else{
-        setScanResult({code:isbn,match:null,source,book:{ean:isbn,title:'Titolo non trovato',seriesName:'',img:openLibraryCover(isbn,'L')||'',publisher:'',price:0,volume:null}});
-        setScanMsg('Metadata non trovati: inserisci o correggi i campi manualmente.');
-      }
-      recordScanHistory({at:new Date().toISOString(),code:isbn,title:(book?.title||exact?.title||'Codice rilevato'),action:'scansione',qty:1,source});
-    }catch(err){
-      setScanMsg('Errore durante la ricerca del titolo: '+(err?.message||String(err)));
-    }finally{setScanBusy(false)}
-  },[data,recordScanHistory]);
-
-  const zxingReaderRef=useRef(null);
-  const zxingControlsRef=useRef(null);
-
-  const ensureZXingReader=useCallback(()=>{
-    if(!window.ZXingBrowser){
-      throw new Error('Motore scanner non caricato.');
-    }
-    if(!zxingReaderRef.current){
-      zxingReaderRef.current = new window.ZXingBrowser.BrowserMultiFormatReader();
-    }
-    return zxingReaderRef.current;
-  },[]);
-
-  const onCodeDetected=useCallback(async(decodedText, source='camera')=>{
-    const code=digitsOnly(decodedText);
-    if(code.length<8)return;
-    const now=Date.now();
-    if(scanLockRef.current)return;
-    if(lastScanRef.current.code===code && (now-lastScanRef.current.ts)<2500)return;
-    scanLockRef.current=true;
-    lastScanRef.current={code,ts:now};
-    try{navigator.vibrate?.(60)}catch(e){}
-    setScanMsg('Codice rilevato: '+code);
-    await stopScanner();
-    await runBarcodeLookup(code, source);
-  },[runBarcodeLookup,stopScanner]);
-
-  const startScanner=useCallback(async()=>{
-    if(scanBusyRef.current)return;
-    if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia){
-      setScanMsg('Fotocamera disponibile solo su HTTPS o localhost.');
-      return;
-    }
-    scanBusyRef.current=true;
-    setScanMsg('Avvio scanner barcode…');
-    try{
-      await stopScanner({resetLock:true});
-      const video=document.getElementById('scan-video');
-      if(!video) throw new Error('Elemento video scanner non trovato.');
-      const streamForLabels=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
-      try{streamForLabels.getTracks().forEach(t=>t.stop())}catch(e){}
-      const cams=await refreshScanCameras();
-      const constraints={
-        video:{
-          ...(scanCameraId?{deviceId:{exact:scanCameraId}}:{facingMode:{ideal:'environment'}}),
-          width:{ideal:1920},
-          height:{ideal:1080},
-          aspectRatio:{ideal:1.7777778}
-        },
-        audio:false
-      };
-      const reader=ensureZXingReader();
-      const controls = await reader.decodeFromConstraints(constraints, video, (result, err, ctrls)=>{
-        if(result?.getText){
-          const text=result.getText();
-          onCodeDetected(text,'camera');
-          return;
-        }
-        const name=err?.name||'';
-        if(name && !/NotFoundException|ChecksumException|FormatException/.test(name)){
-          setScanMsg('Scanner attivo ma la lettura ha restituito: '+name);
-        }
-      });
-      zxingControlsRef.current=controls;
-      video.setAttribute('playsinline','true');
-      video.setAttribute('muted','true');
-      video.muted=true;
-      video.autoplay=true;
-      setScanRunning(true);
-      setScanMsg(cams.length?'Scanner attivo. Riempi il riquadro con il codice principale EAN e tienilo fermo per 1 secondo.':'Scanner attivo. Consenti la camera posteriore e prova con buona luce.');
-    }catch(err){
-      setScanRunning(false);
-      setScanMsg('Impossibile avviare la fotocamera scanner: '+(err?.message||String(err)));
-      try{zxingControlsRef.current?.stop?.()}catch(e){}
-      zxingControlsRef.current=null;
-    }finally{
-      scanBusyRef.current=false;
-    }
-  },[ensureZXingReader,onCodeDetected,refreshScanCameras,scanCameraId,stopScanner]);
-
-  async function handleScanFileChange(e){
-    const file=e.target.files?.[0];
-    if(!file)return;
-    setScanBusy(true);
-    setScanMsg('Analizzo immagine del barcode…');
-    try{
-      await stopScanner({resetLock:true});
-      let detected='';
-      const formats=['ean_13','ean_8','upc_a','upc_e','code_128'];
-      if(window.BarcodeDetector){
-        try{
-          const supported=await window.BarcodeDetector.getSupportedFormats?.();
-          const usable=(supported||formats).filter(f=>formats.includes(f));
-          if(usable.length){
-            const detector=new window.BarcodeDetector({formats:usable});
-            const bmp=await createImageBitmap(file);
-            const found=await detector.detect(bmp);
-            bmp?.close?.();
-            const raw=found?.[0]?.rawValue||'';
-            if(raw) detected=raw;
-          }
-        }catch(err){}
-      }
-      if(!detected){
-        const reader=ensureZXingReader();
-        const url=URL.createObjectURL(file);
-        try{
-          const result=await reader.decodeFromImageUrl(url);
-          detected=(result?.getText?.()||'');
-        }finally{
-          URL.revokeObjectURL(url);
-        }
-      }
-      if(!detected) throw new Error('Nessun barcode leggibile nella foto. Avvicina di più il codice, riempi l'inquadratura ed evita riflessi.');
-      await onCodeDetected(detected,'image');
-    }catch(err){
-      setScanMsg('Foto non leggibile: '+(err?.message||String(err)));
-    }finally{
-      setScanBusy(false);
-      if(e.target)e.target.value='';
-    }
-  }
-
-  useEffect(()=>{
-    if(showScan){
-      stopScanner({resetLock:true});
-      setScanCode('');
-      setScanResult(null);
-      setScanBusy(false);
-      setScanRunning(false);
-      setScanMsg('Usa Scatta barcode per il flusso più affidabile, oppure prova la live beta.');
-    }else stopScanner({resetLock:true});
-  },[isIOS,showScan,stopScanner]);
-
-  function applyScanDelta(mode){
-    if(!scanResult)return;
-    const qty=Math.max(1,parseInt(scanQty)||1);
-    const delta=mode==='load'?qty:-qty;
-    const code=digitsOnly(scanResult.code||scanCode);
-    if(!code)return;
-    if(delta<0 && !scanResult.match){setScanMsg('Per scaricare devo trovare prima il volume nel database.');return}
-    const editorBook={
-      ...(scanResult.book||{}),
-      ean:code,
-      title:String(scanEditor.title||scanResult.book?.title||scanResult.match?.title||'').trim(),
-      seriesName:String(scanEditor.seriesName||scanResult.book?.seriesName||scanResult.match?.seriesName||'').trim(),
-      publisher:String(scanEditor.publisher||scanResult.book?.publisher||scanResult.match?.publisher||'').trim(),
-      volume:parseQty(scanEditor.volume),
-      price:parseNum(scanEditor.price)||0
-    };
-    setData(prev=>{
-      const next=typeof structuredClone==='function'?structuredClone(prev):JSON.parse(JSON.stringify(prev));
-      const match=findBarcodeMatch(next,code)||scanResult.match;
-      const book=editorBook;
-      if(match){
-        const item=next.find(d=>d.id===match.sid);
-        if(!item)return prev;
-        if(match.kind==='series'){
-          item.vd=item.vd||[];
-          let meta=item.vd.find(v=>v.n===match.vol);
-          if(!meta){meta={n:match.vol,g:0,p:book.price||item.p||0,ean:code,t:book.title||match.title,img:book.img||match.img||''};item.vd.push(meta)}
-          meta.ean=code;
-          if(book.title)meta.t=book.title;
-          if(book.img)meta.img=book.img;
-          const current=Number(meta.g||0)|| (item.h.includes(match.vol)?1:0);
-          const qtyNow=Math.max(0,current+delta);
-          meta.g=qtyNow;
-          if(qtyNow>0){if(!item.h.includes(match.vol))item.h.push(match.vol);item.h=item.h.sort((a,b)=>a-b)}
-          else item.h=item.h.filter(v=>v!==match.vol);
-          item.tp=item.h.length;
-          item.mx=Math.max(item.mx||0,item.ut||0,match.vol||0);
-          item.ut=Math.max(item.ut||0,match.vol||0);
-          item.m=gm(item.h,item.ut||item.mx);
-        }else{
-          item.st=item.st||[];
-          let row=item.st[match.index]||item.st[0];
-          if(!row){row={t:book.title||item.n,g:0,p:book.price||item.p||0};item.st=[row]}
-          row.ean=code;
-          if(book.title)row.t=book.title;
-          if(book.img)row.img=book.img;
-          row.g=Math.max(0,(Number(row.g)||0)+delta);
-          item.tp=(item.st||[]).reduce((s,r)=>s+(Number(r.g)||0),0);
-        }
-        return next;
-      }
-      const parsed=parseScanTitleMeta(book.title||code);
-      const seriesName=(book.seriesName||parsed.seriesName||book.title||code).trim();
-      const vol=book.volume||parsed.volume;
-      const existing=next.find(d=>d.s&&normTxt(d.n)===normTxt(seriesName));
-      if(existing&&vol){
-        existing.vd=existing.vd||[];
-        let meta=existing.vd.find(v=>v.n===vol);
-        if(!meta){meta={n:vol,g:0,p:book.price||existing.p||0,ean:code,t:book.title||`${existing.n} ${vol}`,img:book.img||''};existing.vd.push(meta)}
-        meta.g=Math.max(0,(Number(meta.g)||0)+qty);
-        meta.ean=code;
-        if(book.title)meta.t=book.title;
-        if(book.img)meta.img=book.img;
-        if(!existing.h.includes(vol))existing.h.push(vol);
-        existing.h=existing.h.sort((a,b)=>a-b);
-        existing.mx=Math.max(existing.mx||0,vol);
-        existing.ut=Math.max(existing.ut||0,vol);
-        existing.tp=existing.h.length;
-        existing.m=gm(existing.h,existing.ut||existing.mx);
-        return next;
-      }
-      const id=next.length?Math.max(...next.map(d=>d.id))+1:0;
-      if(vol){
-        next.push({id,n:seriesName.toUpperCase(),e:(book.publisher||'N/A').toUpperCase(),h:[vol],m:gm([vol],Math.max(vol,1)),mx:Math.max(vol,1),tu:Math.max(vol,1),ut:Math.max(vol,1),p:book.price||0,tp:1,s:true,vd:[{n:vol,g:qty,p:book.price||0,ean:code,t:(book.title||`${seriesName} ${vol}`).toUpperCase(),img:book.img||''}],st:[]});
-      }else{
-        next.push({id,n:(book.title||seriesName||code).toUpperCase(),e:(book.publisher||'N/A').toUpperCase(),h:[],m:[],mx:0,tu:0,ut:0,p:book.price||0,tp:qty,s:false,vd:[],st:[{t:(book.title||seriesName||code).toUpperCase(),g:qty,p:book.price||0,ean:code,img:book.img||''}]});
-      }
-      return next;
-    });
-    const label=mode==='load'?'carico':'scarico';
-    recordScanHistory({at:new Date().toISOString(),code,title:(scanEditor.title||scanResult.book?.title||scanResult.match?.title||code),action:label,qty,source:scanResult.source||'manual'});
-    setScanMsg(`${label.charAt(0).toUpperCase()+label.slice(1)} registrato: ${qty} ${qty===1?'copia':'copie'} nel database condiviso.`);
-  }
 
   async function importWinvariaFile(e){
     const file=e.target.files?.[0];
@@ -1283,19 +1051,6 @@ function App(){
   }
   function copySetupSQL(){navigator.clipboard?.writeText(SUPABASE_SQL)}
 
-  useEffect(()=>{
-    if(!scanResult)return;
-    const base=scanResult.book||{};
-    setScanEditor({
-      title:base.title||scanResult.match?.title||'',
-      seriesName:base.seriesName||scanResult.match?.seriesName||'',
-      publisher:base.publisher||scanResult.match?.publisher||'',
-      volume:base.volume||scanResult.match?.vol||'',
-      price:base.price!=null&&base.price!==''?String(base.price):String(scanResult.match?.price||'')
-    });
-    setScanQty(1);
-  },[scanResult]);
-
   const filtered=useMemo(()=>{
     let l=[...data];
     if(tab==='favs')l=l.filter(d=>isFav(d.id));
@@ -1335,7 +1090,6 @@ function App(){
       </div>
       <div style={{display:'flex',gap:5,marginBottom:8,flexWrap:'wrap'}}>
         <button className="btn bs ba" onClick={()=>setShowAdd(true)}>+ Aggiungi</button>
-        <button className="btn bs bb" onClick={()=>setShowScan(true)}>📷 Scansiona</button>
         <button className="btn bs bg" onClick={()=>{const c='﻿'+data.map(d=>d.n).join('\n');navigator.clipboard?.writeText(c)}}>CSV</button>
       </div>
       <div className="leg"><span><span className="dt dg"></span>Hai</span><span><span className="dt dr"></span>Manca (tap=opzioni)</span></div>
@@ -1345,10 +1099,10 @@ function App(){
           const miss=d.s?gm(d.h,d.ut||d.mx):[];const mx=d.ut||d.mx;
           const pct=d.s&&mx>0?Math.round(d.h.length/mx*100):100;
           const isE=exp===d.id;const isCo=d.s&&miss.length===0&&d.h.length>=mx;
-          const eanMap=getEanMap(d);const seriesEan=getSeriesEan(d);const seriesImg=getSeriesImg(d);
+          const eanMap=getEanMap(d);const seriesEan=getSeriesEan(d);
           return(<div key={d.id} className={`sc${isE?' ex':''}`}>
             <div className="sh" onClick={()=>setExp(isE?null:d.id)}>
-              <CoverImg ean={seriesEan} img={seriesImg}/>
+              <CoverImg ean={seriesEan} img={getSeriesImg(d)}/>
               <div className="sh-info">
                 <div className="sn"><span className="sn-text">{d.n}</span>
                   {d.s?(isCo?<span className="bdg c">OK</span>:<span className="bdg i">{miss.length}</span>):<span className="bdg sa">1</span>}</div>
@@ -1367,7 +1121,7 @@ function App(){
                 const vd=(d.vd||[]).find(x=>x.n===v);
                 return(<div key={v} className={`vl ${owned?'o':'m'}`}
                   onClick={e=>{e.stopPropagation();if(owned)togVol(d.id,v);else onMissingTap(d.id,v)}}>
-                  <VolCover ean={ean} img={vd?.img} num={v}/>
+                  <VolCover ean={ean} num={v} img={vd?.img||""}/>
                   <div className="vl-num">{v}</div>
                   {vd&&vd.g>1&&<div className="vl-giac">×{vd.g}</div>}
                 </div>)})}</div>
@@ -1444,15 +1198,15 @@ function App(){
   const renderHot=()=>(
     <>
       <div className="bbar" style={{alignItems:'flex-start'}}>
-        <div className="inf"><strong>🔌 Integrazione WinVaria + scanner</strong>Importa l’export giornaliero WinVaria oppure usa la fotocamera del telefono per caricare/scaricare un volume direttamente dal database condiviso.</div>
+        <div className="inf"><strong>🔌 Integrazione WinVaria</strong>Importa l’export giornaliero XLS/XLSX/CSV di WinVaria: l’app aggiorna stock, storico vendite e segnali Hot condivisi.</div>
         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
           <button className="btn bgrn bs" onClick={()=>fWinRef.current?.click()} disabled={winBusy}>{winBusy?'Import…':'⬆ Importa WinVaria'}</button>
-          <button className="btn bs bb" onClick={()=>setShowScan(true)}>📷 Scanner</button>
+          <button className="btn bs bb" onClick={openScanner}>📷 Scatta barcode</button>
           <input ref={fWinRef} type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={importWinvariaFile}/>
           <button className="btn bs ba" onClick={loadHot} disabled={hotLoading}>{hotLoading?'Calcolo…':'🔄 Ricalcola'}</button>
         </div>
       </div>
-      <div className="cloud-help" style={{marginBottom:10}}>Formati consigliati: export vendite o giacenze con colonne tipo EAN/ISBN, quantità venduta e/o giacenza. In più puoi scansionare un ISBN/EAN dal telefono: se il volume esiste lo carichi/scarichi, altrimenti l’app prova a recuperare titolo e copertina e a proporne la creazione.</div>
+      <div className="cloud-help" style={{marginBottom:10}}>Formati consigliati: export vendite o giacenze con colonne tipo EAN/ISBN, quantità venduta e/o giacenza. Se il file ha l’EAN, l’aggancio ai volumi è molto più preciso.</div>
       {winMsg&&<div className="cloud-help" style={{marginBottom:10}}>{winMsg}</div>}
       <div className="cloud-help" style={{marginBottom:10,display:'flex',gap:12,flexWrap:'wrap'}}>
         <span><strong>Oggi:</strong> {salesStats.s1}</span>
@@ -1514,77 +1268,57 @@ function App(){
         </div>
       </div>}
 
-      {showScan&&<div className="mo" onClick={()=>{stopScanner({resetLock:true});setShowScan(false)}}><div className="md scan-modal" onClick={e=>e.stopPropagation()}>
-        <h3>Scanner ISBN / EAN</h3>
-        <div className="scan-box">
-          <div className="scan-tip">Ho rimesso l'app su una base stabile. Per telefono la modalità più affidabile ora è <strong>Scatta barcode</strong>: usa la fotocamera nativa, analizza la foto e poi propone carico o scarico. La live resta disponibile come prova beta.</div>
-          <div className="scan-topbar">
-            <span className="scan-mode-pill">{scanRunning?'🟢 Scanner attivo':'⚪ Scanner fermo'}</span>
-            <button className="btn ba" onClick={()=>scanFileRef.current?.click()}>📷 Scatta barcode</button>
-            <button className="btn bb" onClick={startScanner}>{scanRunning?'🔄 Riavvia live beta':'🎥 Live beta'}</button>
-            <button className="btn bg" onClick={()=>stopScanner({resetLock:false})}>⏸ Ferma</button>
-            <input ref={scanFileRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={handleScanFileChange}/>
-            {(!isIOS || scanCameras.length>0) && <select value={scanCameraId} onChange={e=>setScanCameraId(e.target.value)}><option value="">Camera automatica</option>{scanCameras.map(cam=><option key={cam.id} value={cam.id}>{cam.label||`Camera ${cam.id.slice(0,6)}`}</option>)}</select>}
-          </div>
-          <div className="scan-grid">
-            <div>
-              <div id="scan-reader" className="scan-reader"></div>
-              <div className="scan-stat" style={{marginTop:8}}>Consiglio pratico: per risultati migliori usa <strong>Scatta barcode</strong>, centra solo il codice principale EAN/ISBN, riempi quasi tutto il fotogramma ed evita i riflessi lucidi.</div>
-              <div className="scan-inline" style={{marginTop:10}}>
-                <input value={scanCode} onChange={e=>setScanCode(e.target.value)} placeholder="Inserisci ISBN / EAN manualmente" inputMode="numeric" style={{flex:'1 1 220px',background:'var(--bg)',border:'1px solid var(--brd)',color:'var(--txt)',padding:'10px 12px',borderRadius:10,fontSize:14,fontFamily:'inherit'}}/>
-                <button className="btn ba" onClick={()=>{scanLockRef.current=true;runBarcodeLookup(scanCode,'manual')}} disabled={scanBusy}>{scanBusy?'Cerco…':'Cerca codice'}</button>
-              </div>
-              {scanMsg&&<div className="cloud-help" style={{marginTop:10}}>{scanMsg}</div>}
-            </div>
-            <div className="scan-editor">
-              {scanResult?<div className="scan-result">
-                {coverUrl(scanResult.code,scanResult.book?.img)?<img className="scan-cover" src={coverUrl(scanResult.code,scanResult.book?.img)} alt="cover" onError={e=>{e.currentTarget.style.display='none'}}/>:<div className="scan-cover-ph">📚</div>}
-                <div className="scan-meta">
-                  <div>
-                    {scanResult.match?<span className="scan-pill ok">GIÀ IN DATABASE</span>:<span className="scan-pill info">NUOVO CODICE</span>}
-                    {!scanResult.match&&scanResult.book?.title?<span className="scan-pill warn">LOOKUP ONLINE</span>:null}
-                    <span className="scan-pill info">{scanResult.source==='image'?'DA FOTO':scanResult.source==='camera'?'DA CAMERA':'MANUALE'}</span>
-                  </div>
-                  <h4>{scanEditor.title||scanResult.book?.title||scanResult.match?.title||'Codice rilevato'}</h4>
-                  <div className="scan-code">{scanResult.code}</div>
-                </div>
-              </div>:<div className="cloud-help">Appena rilevo un codice qui compariranno titolo, copertina e i pulsanti operativi.</div>}
-              <div className="fd"><label>Titolo</label><input value={scanEditor.title} onChange={e=>setScanEditor(s=>({...s,title:e.target.value}))} placeholder="Titolo completo"/></div>
-              <div className="fd"><label>Serie</label><input value={scanEditor.seriesName} onChange={e=>setScanEditor(s=>({...s,seriesName:e.target.value}))} placeholder="Nome serie / collana"/></div>
-              <div className="scan-inline">
-                <div className="fd" style={{flex:'1 1 120px'}}><label>Volume</label><input value={scanEditor.volume} onChange={e=>setScanEditor(s=>({...s,volume:e.target.value}))} inputMode="numeric" placeholder="es. 12"/></div>
-                <div className="fd" style={{flex:'1 1 140px'}}><label>Prezzo €</label><input value={scanEditor.price} onChange={e=>setScanEditor(s=>({...s,price:e.target.value}))} inputMode="decimal" placeholder="es. 6,50"/></div>
-                <div className="fd" style={{flex:'1 1 120px'}}><label>Quantità</label><input value={scanQty} onChange={e=>setScanQty(Math.max(1,parseInt(e.target.value)||1))} inputMode="numeric"/></div>
-              </div>
-              <div className="fd"><label>Editore</label><input value={scanEditor.publisher} onChange={e=>setScanEditor(s=>({...s,publisher:e.target.value}))} placeholder="Editore"/></div>
-              <div className="scan-editor-cta">
-                <button className="btn bgrn" onClick={()=>applyScanDelta('load')} disabled={!scanResult}>📥 Carica +{scanQty}</button>
-                <button className="btn bg" onClick={()=>applyScanDelta('unload')} disabled={!scanResult||!scanResult.match}>📤 Scarica -{scanQty}</button>
-                <button className="btn bb" onClick={()=>{stopScanner({resetLock:true});setScanCode('');setScanResult(null);setScanMsg('Pronto per una nuova lettura.');}}>🔄 Nuova scansione</button>
-              </div>
-              <div>
-                <div className="scan-mini-actions" style={{justifyContent:'space-between',marginBottom:8}}>
-                  <strong style={{fontSize:13}}>Scansioni recenti</strong>
-                  {!!scanHistory.length&&<button className="btn bg bs" onClick={()=>setScanHistory([])}>Svuota</button>}
-                </div>
-                <div className="scan-history">
-                  {scanHistory.length?scanHistory.slice(0,8).map(item=><div key={item.id} className="scan-history-item">
-                    <div><strong>{item.title||item.code}</strong><div className="mini">{item.code} · {item.action} {item.qty?`· x${item.qty}`:''}</div></div>
-                    <div className="mini">{new Date(item.at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}</div>
-                  </div>):<div className="cloud-help">Nessuna scansione recente su questo dispositivo.</div>}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="mb" style={{flexWrap:'wrap'}}>
-            <button className="btn bg" onClick={()=>{stopScanner({resetLock:true});setShowScan(false)}}>Chiudi</button>
-          </div>
-        </div>
-      </div></div>}
-
       {showAdd&&<div className="mo" onClick={()=>setShowAdd(false)}><div className="md" onClick={e=>e.stopPropagation()}>
         <h3>Aggiungi serie</h3>
         <AddForm onAdd={addS} onClose={()=>setShowAdd(false)}/>
+      </div></div>}
+
+
+      {showScan&&<div className="mo" onClick={()=>setShowScan(false)}><div className="md" onClick={e=>e.stopPropagation()}>
+        <h3>Scanner barcode stabile</h3>
+        <div className="scan-box">
+          <div className="scan-tip">Usa la fotocamera del telefono per <strong>scattare una foto</strong> del barcode principale sul retro. È il flusso più stabile su iPhone e Android. Dopo la lettura puoi scegliere se <strong>caricare</strong> o <strong>scaricare</strong> il volume dal database condiviso.</div>
+          <div className="scan-actions">
+            <button className="btn bb" onClick={()=>scanFileRef.current?.click()} disabled={scanBusy}>{scanBusy?'Analisi…':'📷 Scatta barcode'}</button>
+            <input ref={scanFileRef} className="scan-file" type="file" accept="image/*" capture="environment" onChange={e=>handleScanFile(e.target.files?.[0])}/>
+            <div className="fd" style={{minWidth:100,margin:0}}><label>Qtà</label><input type="number" min="1" value={scanQty} onChange={e=>setScanQty(Math.max(1,parseInt(e.target.value)||1))}/></div>
+            <button className="btn bg" onClick={()=>{setScanCode('');setScanResult(null);setScanMsg('Pronto per una nuova lettura.');if(scanFileRef.current)scanFileRef.current.value='';}}>Reset</button>
+          </div>
+          <div className="cloud-help">{scanMsg}</div>
+          {scanResult&&<div className="scan-result">
+            {coverUrl(scanResult.ean,scanResult.img)?<img className="scan-cover" src={coverUrl(scanResult.ean,scanResult.img)} alt="" loading="lazy"/>:<div className="scan-cover-ph">📖</div>}
+            <div className="scan-meta">
+              <div>
+                <span className={`scan-pill ${scanResult.kind==='new'?'warn':'ok'}`}>{scanResult.kind==='new'?'NUOVO':'ESISTENTE'}</span>
+                <span className="scan-pill ok">Stock attuale: {parseInt(scanResult.stock)||0}</span>
+              </div>
+              <h4>{scanResult.title||'Titolo'}</h4>
+              <div className="mini">{scanResult.seriesName||'—'} · {scanResult.publisher||'N/A'}</div>
+              <div className="scan-code">{scanCode}</div>
+              <div className="scan-editor" style={{marginTop:10}}>
+                <div className="scan-editor-grid">
+                  <div className="fd"><label>Titolo</label><input value={scanResult.title||''} onChange={e=>updateScanField('title',e.target.value)}/></div>
+                  <div className="fd"><label>Serie / voce</label><input value={scanResult.seriesName||''} onChange={e=>updateScanField('seriesName',e.target.value)}/></div>
+                  <div className="fd"><label>Editore</label><input value={scanResult.publisher||''} onChange={e=>updateScanField('publisher',e.target.value)}/></div>
+                  <div className="fd"><label>Prezzo €</label><input type="number" step="0.01" value={scanResult.price||0} onChange={e=>updateScanField('price',e.target.value)}/></div>
+                </div>
+                <div className="scan-cta">
+                  <button className="btn bgrn" onClick={()=>applyScannedAction('in')}>📥 Carica +{scanQty}</button>
+                  <button className="btn ba" onClick={()=>applyScannedAction('out')} disabled={scanResult.kind==='new'}>📤 Scarica -{scanQty}</button>
+                </div>
+              </div>
+            </div>
+          </div>}
+          {!!scanHistory.length&&<div>
+            <div className="scan-tip" style={{marginBottom:6}}>Ultime scansioni</div>
+            <div className="scan-history">
+              {scanHistory.slice(0,8).map(h=><div key={h.id} className="scan-history-item"><div><strong>{h.title}</strong><div className="mini">{h.code}</div></div><div className="mini">{h.mode==='in'?'📥':'📤'} {h.qty}<br/>{h.at}</div></div>)}
+            </div>
+          </div>}
+          <div className="mb" style={{flexWrap:'wrap'}}>
+            <button className="btn bg" onClick={()=>setShowScan(false)}>Chiudi</button>
+          </div>
+        </div>
       </div></div>}
 
       {showCloud&&<div className="mo" onClick={()=>setShowCloud(false)}><div className="md" onClick={e=>e.stopPropagation()}>
