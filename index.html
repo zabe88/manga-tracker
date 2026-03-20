@@ -177,6 +177,35 @@ input[type="file"]{display:none}
 .scan-pill.ok{background:rgba(59,178,115,.12);color:var(--grn);border-color:rgba(59,178,115,.25)}
 .scan-pill.warn{background:rgba(255,184,0,.1);color:var(--yel);border-color:rgba(255,184,0,.2)}
 @media(max-width:760px){.scan-editor-grid{grid-template-columns:1fr}}
+
+/* Banco mode */
+.bank-shell{display:grid;gap:12px}
+.bank-hero{display:grid;gap:12px;padding:14px;border-radius:16px;border:1px solid var(--brd);background:linear-gradient(135deg,#171c27,#101318)}
+.bank-hero h2{margin:0;font-size:18px;color:var(--txt)}
+.bank-hero p{margin:0;color:var(--dim);font-size:13px;line-height:1.45}
+.bank-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.bank-actions .fd{margin:0}
+.bank-main{min-width:180px}
+.bank-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:12px}
+.bank-card{padding:12px;border-radius:14px;border:1px solid var(--brd);background:linear-gradient(135deg,#151922,#111318)}
+.bank-card h3{margin:0 0 10px;font-size:14px;color:var(--txt)}
+.bank-last{display:flex;gap:12px;align-items:flex-start}
+.bank-last-cover{width:86px;height:122px;border-radius:12px;object-fit:cover;background:var(--bg);border:1px solid var(--brd)}
+.bank-last-ph{width:86px;height:122px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--bg);border:1px solid var(--brd);color:var(--dim)}
+.bank-last-meta{flex:1;min-width:0}
+.bank-last-meta h4{margin:0 0 6px;font-size:16px;color:var(--txt)}
+.bank-last-meta .mini{font-size:12px;color:var(--dim);line-height:1.45}
+.bank-quick{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.bank-kpi{display:flex;gap:8px;flex-wrap:wrap}
+.bank-kpi .chip{padding:7px 10px;border-radius:999px;border:1px solid var(--brd);background:var(--bg);font-size:12px;color:var(--dim)}
+.bank-history{display:grid;gap:8px;max-height:420px;overflow:auto;padding-right:2px}
+.bank-move{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid var(--brd);background:linear-gradient(135deg,#151922,#111318)}
+.bank-move strong{display:block;font-size:13px;color:var(--txt);margin-bottom:3px}
+.bank-move .mini{font-size:11px;color:var(--dim);line-height:1.45}
+.bank-low{display:grid;gap:8px}
+.bank-low-item{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:10px;border:1px solid var(--brd);background:var(--bg);font-size:12px}
+.bank-empty{padding:18px;border:1px dashed var(--brd);border-radius:14px;color:var(--dim);text-align:center}
+@media(max-width:900px){.bank-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -204,6 +233,7 @@ const K_TS=SK+'_ts';
 const K_FAV=SK+'_fav';
 const K_CART=SK+'_cart';
 const K_CFG=SK+'_cfg';
+const K_MOVES=SK+'_moves';
 const CLOUD_ROW_ID='main';
 const SUPABASE_SQL=`create table if not exists public.app_state (
   id text primary key,
@@ -300,7 +330,8 @@ function normalizePayload(payload){
   const data=Array.isArray(base.data)&&base.data.length?base.data:prep();
   const favs=Array.isArray(base.favs)?base.favs:[];
   const cart=Array.isArray(base.cart)?base.cart:[];
-  return{data,favs,cart};
+  const moves=Array.isArray(base.moves)?base.moves:[];
+  return{data,favs,cart,moves};
 }
 
 function normTxt(v){
@@ -491,6 +522,8 @@ function App(){
   const[showAdd,setShowAdd]=useState(false);const[sortBy,setSortBy]=useState('name');
   const[favs,setFavs]=useState(()=>{const v=safeParse(localStorage.getItem(K_FAV),[]);return Array.isArray(v)?v:[]});
   const[cart,setCart]=useState(()=>{const v=safeParse(localStorage.getItem(K_CART),[]);return Array.isArray(v)?v:[]});
+  const[moves,setMoves]=useState(()=>{const v=safeParse(localStorage.getItem(K_MOVES),[]);return Array.isArray(v)?v:[]});
+  const[bankQty,setBankQty]=useState(1);
   const[popup,setPopup]=useState(null);
   const[hotData,setHotData]=useState(()=>buildLocalHot(Array.isArray(cachedData)&&cachedData.length?cachedData:prep(), safeParse(localStorage.getItem(K_FAV),[]), safeParse(localStorage.getItem(K_CART),[])));
   const[hotLoading,setHotLoading]=useState(false);
@@ -523,7 +556,7 @@ function App(){
   const pushTimerRef=useRef(null);
   const channelRef=useRef(null);
   const channelClientRef=useRef(null);
-  const cloudPayloadRef=useRef(normalizePayload({data,favs,cart}));
+  const cloudPayloadRef=useRef(normalizePayload({data,favs,cart,moves}));
 
   const cloudEnabled=!!(cloudCfg.url&&cloudCfg.key);
 
@@ -533,6 +566,7 @@ function App(){
     setData(normalized.data);
     setFavs(normalized.favs);
     setCart(normalized.cart);
+    setMoves(normalized.moves);
     if(updatedAt){
       const t=new Date(updatedAt).toLocaleString('it-IT');
       localStorage.setItem(K_TS,t);
@@ -540,19 +574,20 @@ function App(){
     }
   },[]);
 
-  const cloudPayload=useMemo(()=>normalizePayload({data,favs,cart}),[data,favs,cart]);
+  const cloudPayload=useMemo(()=>normalizePayload({data,favs,cart,moves}),[data,favs,cart,moves]);
   useEffect(()=>{cloudPayloadRef.current=cloudPayload},[cloudPayload]);
 
   useEffect(()=>{try{
     localStorage.setItem(K_DATA,JSON.stringify(data));
     localStorage.setItem(K_FAV,JSON.stringify(favs));
     localStorage.setItem(K_CART,JSON.stringify(cart));
+    localStorage.setItem(K_MOVES,JSON.stringify(moves));
     if(!(supabase&&session&&remoteLoaded)){
       const t=new Date().toLocaleString('it-IT');
       localStorage.setItem(K_TS,t);
       setTs(t);
     }
-  }catch(e){}}, [data,favs,cart,supabase,session,remoteLoaded]);
+  }catch(e){}}, [data,favs,cart,moves,supabase,session,remoteLoaded]);
 
   const loadHot=useCallback(()=>{
     setHotLoading(true);
@@ -721,13 +756,33 @@ function App(){
     clearTimeout(pushTimerRef.current);
     pushTimerRef.current=setTimeout(()=>{pushRemote()},700);
     return()=>clearTimeout(pushTimerRef.current);
-  },[data,favs,cart,supabase,session,remoteLoaded,pushRemote]);
+  },[data,favs,cart,moves,supabase,session,remoteLoaded,pushRemote]);
 
   useEffect(()=>()=>{try{if(channelRef.current&&channelClientRef.current)channelClientRef.current.removeChannel(channelRef.current)}catch(e){}},[]);
 
   const editori=useMemo(()=>{const m={};data.forEach(d=>{m[d.e]=(m[d.e]||0)+1});return Object.entries(m).sort((a,b)=>b[1]-a[1])}, [data]);
   const stats=useMemo(()=>{let ow=0,mi=0,pz=0;data.forEach(d=>{if(d.s){ow+=d.h.length;const mx=d.ut||d.mx;for(let i=1;i<=mx;i++)if(!d.h.includes(i))mi++}pz+=d.tp});return{t:data.length,ow,mi,pz}}, [data]);
   const salesStats=useMemo(()=>{let s1=0,s7=0,s30=0,low=0,last='';data.forEach(d=>{(d.vd||[]).forEach(v=>{const snap=volumeSalesSnapshot(v);s1+=snap.s1;s7+=snap.s7;s30+=snap.s30;if((parseInt(v.g)||0)<=1 && snap.s30>0)low++;if(snap.last&&(!last||snap.last>last))last=snap.last})});return{s1,s7,s30,low,last}},[data]);
+  const bankLastCode=useMemo(()=>digitsOnly((moves[0]&&moves[0].code)||scanCode||''),[moves,scanCode]);
+  const bankLast=useMemo(()=>{
+    if(bankLastCode){
+      const found=findBarcodeMatch(data,bankLastCode);
+      if(found)return found;
+    }
+    if(scanResult&&digitsOnly(scanResult.ean||scanCode)===bankLastCode)return {...scanResult,ean:bankLastCode||scanResult.ean||''};
+    return scanResult||null;
+  },[data,moves,scanResult,scanCode,bankLastCode]);
+  const bankLow=useMemo(()=>{
+    const rows=[];
+    data.forEach(d=>{
+      if(d.s){
+        (d.vd||[]).forEach(v=>{const g=parseInt(v.g)||0;if(g<=1)rows.push({id:`${d.id}-${v.n}`,title:v.t||`${d.n} ${v.n}`,series:d.n,stock:g,ean:v.ean||'',img:v.img||''});});
+      }else{
+        (d.st||[]).forEach((s,i)=>{const g=parseInt(s.g)||0;if(g<=1)rows.push({id:`${d.id}-s-${i}`,title:s.t||d.n,series:d.n,stock:g,ean:s.ean||'',img:s.img||''});});
+      }
+    });
+    return rows.sort((a,b)=>a.stock-b.stock||a.title.localeCompare(b.title)).slice(0,8);
+  },[data]);
 
   function getEanMap(d){const m={};(d.vd||[]).forEach(v=>{if(v.ean)m[v.n]=v.ean});return m}
   function getSeriesEan(d){if(d.vd&&d.vd.length>0){const f=d.vd.find(v=>v.ean);if(f)return f.ean}if(d.st&&d.st.length>0){const f=d.st.find(s=>s.ean);if(f)return f.ean}return null}
@@ -828,6 +883,7 @@ function App(){
   function delS(id){if(confirm('Eliminare?')){setData(p=>p.filter(d=>d.id!==id));setExp(null)}}
 
   function openScanner(){
+    setTab('banco');
     setShowScan(true);
     setScanBusy(false);
     setScanCode('');
@@ -1036,63 +1092,103 @@ function App(){
 
   function updateScanField(field,value){setScanResult(r=>r?({...r,[field]:value}):r)}
 
-  function applyScannedAction(mode){
-    if(!scanResult || !scanCode) return;
-    const qty=Math.max(1,parseInt(scanQty)||1);
-    const today=new Date().toISOString().slice(0,10);
+  function registerMove(entry){
+    const full={id:Date.now()+Math.random(),...entry};
+    setMoves(prev=>[full,...prev].slice(0,250));
+    setScanHistory(prev=>[{id:full.id,code:full.code,title:full.title,mode:full.mode,qty:full.qty,at:full.atLabel},...prev].slice(0,30));
+  }
+
+  function commitBarcodeMovement(mode,qty,code,meta,opts={}){
+    const cleanCode=digitsOnly(code);
+    if(!cleanCode || !meta) return;
+    const amount=Math.max(1,parseInt(qty)||1);
+    const now=new Date();
+    const today=now.toISOString().slice(0,10);
+    let appliedStock=0;
     setData(prev=>{
       let touched=false;
       const next=prev.map(d=>{
         if(d.s){
-          const idx=(d.vd||[]).findIndex(v=>digitsOnly(v.ean)===scanCode);
+          const idx=(d.vd||[]).findIndex(v=>digitsOnly(v.ean)===cleanCode);
           if(idx<0) return d;
           touched=true;
           const vd=(d.vd||[]).map(v=>({...v, wv:v?.wv?{...v.wv,events:[...(v.wv.events||[])]}:undefined}));
           const curr={...vd[idx]};
           const g0=parseInt(curr.g)||0;
-          const g1=mode==='in' ? g0+qty : Math.max(0,g0-qty);
+          const g1=mode==='in' ? g0+amount : Math.max(0,g0-amount);
+          appliedStock=g1;
           curr.g=g1;
-          curr.t=scanResult.title||curr.t||`${d.n} ${curr.n}`;
-          curr.img=scanResult.img||curr.img||'';
-          curr.p=parseFloat(scanResult.price)||curr.p||d.p||0;
+          curr.t=meta.title||curr.t||`${d.n} ${curr.n}`;
+          curr.img=meta.img||curr.img||'';
+          curr.p=parseFloat(meta.price)||curr.p||d.p||0;
           if(mode==='out'){
             const events=Array.isArray(curr.wv?.events)?[...curr.wv.events]:[];
-            events.push({d:today,q:qty});
+            events.push({d:today,q:amount});
             curr.wv={...(curr.wv||{}),events,last:today};
           }
           vd[idx]=curr;
           const owned=g1>0 ? Array.from(new Set([...(d.h||[]),curr.n])).sort((a,b)=>a-b) : (d.h||[]).filter(x=>x!==curr.n);
           return {...d,vd,h:owned,m:gm(owned,d.ut||d.mx),tp:owned.length};
         }
-        const idx=(d.st||[]).findIndex(s=>digitsOnly(s.ean)===scanCode);
+        const idx=(d.st||[]).findIndex(s=>digitsOnly(s.ean)===cleanCode);
         if(idx<0) return d;
         touched=true;
         const st=(d.st||[]).map(s=>({...s}));
         const curr={...st[idx]};
         const g0=parseInt(curr.g)||0;
-        const g1=mode==='in' ? g0+qty : Math.max(0,g0-qty);
+        const g1=mode==='in' ? g0+amount : Math.max(0,g0-amount);
+        appliedStock=g1;
         curr.g=g1;
-        curr.t=scanResult.title||curr.t||d.n;
-        curr.img=scanResult.img||curr.img||'';
-        curr.p=parseFloat(scanResult.price)||curr.p||d.p||0;
+        curr.t=meta.title||curr.t||d.n;
+        curr.img=meta.img||curr.img||'';
+        curr.p=parseFloat(meta.price)||curr.p||d.p||0;
         st[idx]=curr;
         return {...d,st,tp:st.reduce((s,x)=>s+(parseInt(x.g)||0),0)};
       });
       if(touched) return next;
       if(mode==='out') return prev;
       const nextId=(prev.length?Math.max(...prev.map(d=>d.id)):0)+1;
-      const price=parseFloat(scanResult.price)||0;
-      const title=(scanResult.title||`Codice ${scanCode}`).trim();
-      const publisher=(scanResult.publisher||'N/A').trim()||'N/A';
-      return [...prev,{id:nextId,n:(scanResult.seriesName||title).toUpperCase(),e:publisher.toUpperCase(),h:[],mx:0,tu:0,ut:0,p:price,tp:qty,s:false,st:[{t:title,g:qty,p:price,ean:scanCode,img:scanResult.img||''}],vd:[]}];
+      const price=parseFloat(meta.price)||0;
+      const title=(meta.title||`Codice ${cleanCode}`).trim();
+      const publisher=(meta.publisher||'N/A').trim()||'N/A';
+      appliedStock=amount;
+      return [...prev,{id:nextId,n:(meta.seriesName||title).toUpperCase(),e:publisher.toUpperCase(),h:[],mx:0,tu:0,ut:0,p:price,tp:amount,s:false,st:[{t:title,g:amount,p:price,ean:cleanCode,img:meta.img||''}],vd:[]}];
     });
-    setScanResult(r=>r?({...r,stock: mode==='in' ? (parseInt(r.stock)||0)+qty : Math.max(0,(parseInt(r.stock)||0)-qty)}):r);
-    setScanHistory(prev=>[{id:Date.now(),code:scanCode,title:scanResult.title||scanResult.seriesName||scanCode,mode,qty,at:new Date().toLocaleString('it-IT')},...prev].slice(0,30));
-    setScanMsg(mode==='in'?'Carico registrato nel database condiviso.':'Scarico registrato nel database condiviso.');
+    const effectiveMeta={...meta,ean:cleanCode,stock:appliedStock};
+    registerMove({
+      code:cleanCode,
+      title:effectiveMeta.title||effectiveMeta.seriesName||cleanCode,
+      seriesName:effectiveMeta.seriesName||effectiveMeta.title||'',
+      publisher:effectiveMeta.publisher||'N/A',
+      qty:amount,
+      mode,
+      stock:appliedStock,
+      by:session?.user?.email||'Utente',
+      atISO:now.toISOString(),
+      atLabel:now.toLocaleString('it-IT')
+    });
+    if(opts.keepScanner!==false){
+      setScanResult(r=>r?({...r,stock:appliedStock}):r);
+      setScanMsg(mode==='in'?'Carico registrato nel database condiviso.':'Scarico registrato nel database condiviso.');
+    }
+    if(opts.closeScanner){
+      setShowScan(false);
+      setTab('banco');
+    }
   }
 
-  function dlBackup(){const b=new Blob([JSON.stringify({data,favs,cart},null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`manga_backup_${new Date().toISOString().slice(0,10)}.json`;a.click()}
-  function loadBackup(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.data&&Array.isArray(d.data)){if(confirm(`${d.data.length} serie trovate. Sostituire?`)){setData(d.data);if(d.favs)setFavs(d.favs);if(d.cart)setCart(d.cart);setExp(null)}}else if(Array.isArray(d)){if(confirm(`${d.length} serie. Sostituire?`)){setData(d);setExp(null)}}}catch(err){alert('Errore: '+err.message)}};r.readAsText(f);e.target.value=''}
+  function applyScannedAction(mode){
+    if(!scanResult || !scanCode) return;
+    commitBarcodeMovement(mode,scanQty,scanCode,scanResult,{closeScanner:true});
+  }
+
+  function applyBankLast(mode){
+    if(!bankLast || !bankLastCode) return;
+    commitBarcodeMovement(mode,bankQty,bankLastCode,bankLast,{keepScanner:false});
+  }
+
+  function dlBackup(){const b=new Blob([JSON.stringify({data,favs,cart,moves},null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`manga_backup_${new Date().toISOString().slice(0,10)}.json`;a.click()}
+  function loadBackup(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.data&&Array.isArray(d.data)){if(confirm(`${d.data.length} serie trovate. Sostituire?`)){setData(d.data);if(d.favs)setFavs(d.favs);if(d.cart)setCart(d.cart);if(Array.isArray(d.moves))setMoves(d.moves);setExp(null)}}else if(Array.isArray(d)){if(confirm(`${d.length} serie. Sostituire?`)){setData(d);setExp(null)}}}catch(err){alert('Errore: '+err.message)}};r.readAsText(f);e.target.value=''}
 
   async function importWinvariaFile(e){
     const file=e.target.files?.[0];
@@ -1354,6 +1450,64 @@ function App(){
     </>
   );
 
+  const renderBanco=()=>{
+    const current=bankLast;
+    return(
+      <>
+        <div className="bank-shell">
+          <div className="bank-hero">
+            <div>
+              <h2>Banco · carico/scarico rapidissimo</h2>
+              <p>Questa schermata è pensata per il banco: scatti il barcode, l’app capisce il volume e poi puoi continuare a muovere l’ultimo articolo con i pulsanti rapidi.</p>
+            </div>
+            <div className="bank-kpi">
+              <span className="chip">Movimenti condivisi: {moves.length}</span>
+              <span className="chip">Vendite oggi: {salesStats.s1}</span>
+              <span className="chip">Stock sotto soglia: {bankLow.length}</span>
+            </div>
+            <div className="bank-actions">
+              <button className="btn bb bank-main" onClick={openScanner}>📷 Scatta barcode</button>
+              <div className="fd" style={{minWidth:96}}><label>Qtà rapida</label><input type="number" min="1" value={bankQty} onChange={e=>setBankQty(Math.max(1,parseInt(e.target.value)||1))}/></div>
+              <button className="btn bgrn" onClick={()=>applyBankLast('in')} disabled={!current}>📥 +{bankQty}</button>
+              <button className="btn ba" onClick={()=>applyBankLast('out')} disabled={!current}>📤 -{bankQty}</button>
+              <button className="btn bg" onClick={()=>setShowAdd(true)}>➕ Nuovo titolo</button>
+            </div>
+          </div>
+
+          <div className="bank-grid">
+            <div className="bank-card">
+              <h3>Ultimo articolo operativo</h3>
+              {current?<div className="bank-last">
+                {coverUrl(current.ean,current.img)?<img className="bank-last-cover" src={coverUrl(current.ean,current.img)} alt="" loading="lazy"/>:<div className="bank-last-ph">📚</div>}
+                <div className="bank-last-meta">
+                  <h4>{current.title||current.seriesName||'Titolo non disponibile'}</h4>
+                  <div className="mini">{current.seriesName||'—'} · {current.publisher||'N/A'}</div>
+                  <div className="scan-code">{bankLastCode||current.ean||'—'}</div>
+                  <div className="mini" style={{marginTop:8}}>Stock attuale: <strong style={{color:'var(--txt)'}}>{parseInt(current.stock)||0}</strong></div>
+                  <div className="bank-quick">
+                    <button className="btn bgrn" onClick={()=>applyBankLast('in')}>📥 Carica +{bankQty}</button>
+                    <button className="btn ba" onClick={()=>applyBankLast('out')}>📤 Scarica -{bankQty}</button>
+                    <button className="btn bg" onClick={openScanner}>📷 Scansiona altro</button>
+                  </div>
+                </div>
+              </div>:<div className="bank-empty">Nessun articolo recente. Usa <strong>Scatta barcode</strong> per iniziare.</div>}
+            </div>
+
+            <div className="bank-card">
+              <h3>Sotto soglia</h3>
+              {bankLow.length?<div className="bank-low">{bankLow.map(item=><div key={item.id} className="bank-low-item"><div><strong>{item.title}</strong><div className="mini">{item.series}</div></div><div className="mini">Stock {item.stock}</div></div>)}</div>:<div className="bank-empty">Nessun articolo critico in questo momento.</div>}
+            </div>
+          </div>
+
+          <div className="bank-card">
+            <h3>Storico movimenti condiviso</h3>
+            {moves.length?<div className="bank-history">{moves.slice(0,30).map(m=><div key={m.id} className="bank-move"><div><strong>{m.title}</strong><div className="mini">{m.seriesName||'—'} · {m.code}</div></div><div className="mini"><span className={`scan-pill ${m.mode==='in'?'ok':'warn'}`}>{m.mode==='in'?'CARICO':'SCARICO'}</span><br/>Qtà {m.qty} · stock {m.stock}<br/>{m.atLabel||m.atISO}<br/>{m.by||'Utente'}</div></div>)}</div>:<div className="bank-empty">Ancora nessun movimento registrato.</div>}
+          </div>
+        </div>
+      </>
+    );
+  };
+
   const renderHot=()=>(
     <>
       <div className="bbar" style={{alignItems:'flex-start'}}>
@@ -1413,6 +1567,7 @@ function App(){
       {tab==='favs'&&renderCatalog()}
       {tab==='missing'&&renderMissing()}
       {tab==='cart'&&renderCart()}
+      {tab==='banco'&&renderBanco()}
       {tab==='hot'&&renderHot()}
 
       {popup&&<div className="popup-overlay" onClick={()=>setPopup(null)}>
@@ -1524,6 +1679,7 @@ function App(){
         <button className={tab==='favs'?'on':''} onClick={()=>setTab('favs')}><span className="ico">⭐</span>Preferiti{favs.length>0&&<span className="badge-n">{favs.length}</span>}</button>
         <button className={tab==='missing'?'on':''} onClick={()=>setTab('missing')}><span className="ico">📋</span>Mancanti</button>
         <button className={tab==='cart'?'on':''} onClick={()=>setTab('cart')}><span className="ico">🛒</span>Carrello{cart.length>0&&<span className="badge-n">{cart.length}</span>}</button>
+        <button className={tab==='banco'?'on':''} onClick={()=>setTab('banco')}><span className="ico">📷</span>Banco</button>
         <button className={tab==='hot'?'on':''} onClick={()=>setTab('hot')}><span className="ico">🔥</span>Hot</button>
       </nav>
     </div>);
